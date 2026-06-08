@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - master
+    tags:
+      - v*
   workflow_dispatch:
 
 jobs:
@@ -32,5 +34,5 @@ jobs:
       - name: Upload bundle
         uses: actions/upload-artifact@v4
         with:
-          name: work-daily-note-windows
+          name: work-daily-note-windows-${{ github.ref_name }}
           path: src-tauri/target/release/bundle/nsis/*

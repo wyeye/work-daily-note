@@ -74,3 +74,32 @@ git status --short
 1. 每个独立变更单独提交。
 2. 不提交 `node_modules/`、`dist/`、`out/`、`.env*`、日志和 `docs/superpowers/`。
 3. 提交前检查暂存内容，确认没有真实密钥。
+
+## 版本与升级
+
+1. 升级版本号时统一使用：
+
+```bash
+npm run version:set 0.1.1
+```
+
+该命令会同步更新：
+
+- `package.json`
+- `package-lock.json`
+- `src-tauri/Cargo.toml`
+- `src-tauri/tauri.conf.json`
+
+2. 发布新版本时使用 tag 触发 GitHub Actions Windows 打包：
+
+```bash
+git add package.json package-lock.json src-tauri/Cargo.toml src-tauri/tauri.conf.json
+git commit -m "升级版本到0.1.1"
+git tag v0.1.1
+git push
+git push origin v0.1.1
+```
+
+3. Tauri `identifier` 必须保持不变：`com.wyeye.work-daily-note`。版本号升高后，用户运行新版安装包即可覆盖升级旧版。
+
+4. 推送到 `master` 会自动构建 Windows 安装包；推送 `v*` tag 会构建带 tag 名称的 artifact。

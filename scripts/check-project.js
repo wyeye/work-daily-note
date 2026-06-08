@@ -6,6 +6,8 @@ const path = require('path');
 const root = path.resolve(__dirname, '..');
 const requiredFiles = [
   'package.json',
+  '.github/workflows/build-windows.yml',
+  'scripts/set-version.js',
   'src-tauri/Cargo.toml',
   'src-tauri/tauri.conf.json',
   'src-tauri/capabilities/default.json',
@@ -42,13 +44,45 @@ if (fs.existsSync(path.join(root, 'src', 'main'))) {
 }
 
 const packageJson = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf-8'));
-for (const scriptName of ['check', 'tauri:dev', 'tauri:build']) {
+for (const scriptName of ['check', 'tauri:dev', 'tauri:build', 'version:set']) {
   if (!packageJson.scripts || !packageJson.scripts[scriptName]) {
     throw new Error(`missing package script: ${scriptName}`);
   }
 }
 if ((packageJson.devDependencies || {}).electron || (packageJson.devDependencies || {})['electron-builder']) {
   throw new Error('electron dependencies should be removed after Tauri migration');
+}
+
+const packageLock = JSON.parse(fs.readFileSync(path.join(root, 'package-lock.json'), 'utf-8'));
+const tauriConfig = JSON.parse(fs.readFileSync(path.join(root, 'src-tauri/tauri.conf.json'), 'utf-8'));
+const cargoText = fs.readFileSync(path.join(root, 'src-tauri/Cargo.toml'), 'utf-8');
+const cargoVersionMatch = cargoText.match(/^version\s*=\s*"([^"]+)"/m);
+if (!cargoVersionMatch) {
+  throw new Error('missing Cargo package version');
+}
+for (const [name, value] of Object.entries({
+  packageLock: packageLock.version,
+  packageLockRoot: packageLock.packages && packageLock.packages[''] && packageLock.packages[''].version,
+  tauriConfig: tauriConfig.version,
+  cargo: cargoVersionMatch[1]
+})) {
+  if (value !== packageJson.version) {
+    throw new Error(`version mismatch: ${name}=${value}, package=${packageJson.version}`);
+  }
+}
+
+const versionScriptText = fs.readFileSync(path.join(root, 'scripts/set-version.js'), 'utf-8');
+for (const snippet of ['package-lock.json', 'src-tauri/Cargo.toml', 'src-tauri/tauri.conf.json', 'Version updated to']) {
+  if (!versionScriptText.includes(snippet)) {
+    throw new Error(`missing version script snippet: ${snippet}`);
+  }
+}
+
+const workflowText = fs.readFileSync(path.join(root, '.github/workflows/build-windows.yml'), 'utf-8');
+for (const snippet of ['push:', 'tags:', '- v*', 'workflow_dispatch:', 'work-daily-note-windows-${{ github.ref_name }}']) {
+  if (!workflowText.includes(snippet)) {
+    throw new Error(`missing workflow snippet: ${snippet}`);
+  }
 }
 
 const tauriConfigText = fs.readFileSync(path.join(root, 'src-tauri/tauri.conf.json'), 'utf-8');

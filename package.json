@@ -1,6 +1,6 @@
 {
   "name": "work-daily-note",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Win11 desktop note app for organizing daily work notes into ZenTao-ready text.",
   "private": true,
   "license": "UNLICENSED",
@@ -10,7 +10,8 @@
   "scripts": {
     "check": "node scripts/check-project.js",
     "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build"
+    "tauri:build": "tauri build",
+    "version:set": "node scripts/set-version.js"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.11.0"
