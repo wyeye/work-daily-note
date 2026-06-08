@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Work Daily Note</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="app-header">
+    <div>
+      <h1>Work Daily Note</h1>
+      <p>记录零散事项，生成禅道日报文本</p>
+    </div>
+    <nav class="tabs" aria-label="主导航">
+      <button class="tab active" data-route="notes">记录</button>
+      <button class="tab" data-route="organize">整理</button>
+      <button class="tab" data-route="settings">设置</button>
+    </nav>
+  </header>
+
+  <main>
+    <section id="notesView" class="view active">
+      <form id="noteForm" class="card input-card">
+        <label for="noteContent">快速记录</label>
+        <div class="note-input-row">
+          <textarea id="noteContent" rows="3" placeholder="例如：帮同事排查接口报错，定位到参数问题"></textarea>
+          <button type="submit">保存</button>
+        </div>
+        <p class="hint">按 Enter 保存，按 Shift + Enter 换行。</p>
+        <div class="category-row" id="categoryOptions"></div>
+      </form>
+
+      <section class="card">
+        <div class="section-title">
+          <h2>今日事项</h2>
+          <span id="noteCount">0 条</span>
+        </div>
+        <div id="notesList" class="notes-list"></div>
+      </section>
+    </section>
+
+    <section id="organizeView" class="view">
+      <section class="card">
+        <div class="section-title">
+          <h2>AI 整理</h2>
+          <button id="organizeButton" type="button">AI 整理今日事项</button>
+        </div>
+        <div id="summaryList" class="summary-list"></div>
+        <label for="resultText">禅道文本</label>
+        <textarea id="resultText" rows="12" readonly></textarea>
+        <div class="actions">
+          <button id="copyButton" type="button">复制到剪贴板</button>
+        </div>
+      </section>
+    </section>
+
+    <section id="settingsView" class="view">
+      <form id="settingsForm" class="card settings-form">
+        <h2>AI 与提醒设置</h2>
+        <label for="apiBaseUrl">OpenAI 兼容接口地址</label>
+        <input id="apiBaseUrl" type="url" placeholder="https://api.example.com/v1">
+        <label for="apiKey">API Key</label>
+        <input id="apiKey" type="password" autocomplete="off" placeholder="只保存在本机配置">
+        <label for="model">模型名</label>
+        <input id="model" type="text" placeholder="gpt-4.1-mini">
+        <label for="reminderTime">提醒时间</label>
+        <input id="reminderTime" type="time" value="18:00">
+        <button type="submit">保存设置</button>
+      </form>
+    </section>
+  </main>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+  <script src="app.js"></script>
+</body>
+</html>
