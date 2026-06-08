@@ -8,6 +8,21 @@
 2. 应用只生成文本并复制到剪贴板，不自动登录禅道，不自动提交禅道。
 3. AI 使用 OpenAI 兼容接口，接口地址、API Key、模型名由用户在本机配置。
 
+## Node.js 环境
+
+当前开发环境：
+
+- Node.js 路径：`/root/.nvm/versions/node/v24.15.0/bin/node`
+- Node.js 版本：`v24.15.0`
+- npm 路径：`/root/.nvm/versions/node/v24.15.0/bin/npm`
+- npm 版本：`11.12.1`
+
+约定：
+
+1. 优先使用上述 nvm Node.js 环境开发。
+2. `package.json` 完成后，在 `engines.node` 记录支持版本。
+3. 升级 Node.js 或 npm 后，同步更新本节。
+
 ## 开发规范
 
 1. 使用 Electron + Node.js CommonJS，默认不引入前端框架。
