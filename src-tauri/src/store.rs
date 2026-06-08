@@ -2,7 +2,7 @@ use chrono::{Datelike, Local, Utc};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
-use std::fs::{self, File};
+use std::fs::{self, File, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use uuid::Uuid;
@@ -27,9 +27,19 @@ pub struct Note {
     #[serde(default)]
     pub date: String,
     #[serde(default)]
+    pub tags: Vec<String>,
+    #[serde(default)]
+    pub project: String,
+    #[serde(default)]
     pub created_at: String,
     #[serde(default)]
     pub updated_at: String,
+    #[serde(default)]
+    pub deleted_at: Option<String>,
+    #[serde(default = "default_revision")]
+    pub revision: u32,
+    #[serde(default)]
+    pub updated_by: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -104,6 +114,25 @@ struct SecretsFile {
     api_key: String,
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DeviceFile {
+    #[serde(default = "default_schema_version")]
+    schema_version: u32,
+    #[serde(default)]
+    device_id: String,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ChangeRecord {
+    entity_type: String,
+    entity_id: String,
+    operation: String,
+    revision: u32,
+    changed_at: String,
+}
+
 #[derive(Clone, Debug)]
 struct StorePaths {
     app_dir: PathBuf,
@@ -117,6 +146,7 @@ struct StorePaths {
     ai_settings_file: PathBuf,
     reminder_settings_file: PathBuf,
     secrets_file: PathBuf,
+    device_file: PathBuf,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -127,6 +157,10 @@ pub struct NoteInput {
     pub category: String,
     #[serde(default)]
     pub date: String,
+    #[serde(default)]
+    pub tags: Vec<String>,
+    #[serde(default)]
+    pub project: String,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -134,23 +168,27 @@ pub struct NoteInput {
 pub struct NotePatch {
     pub content: Option<String>,
     pub category: Option<String>,
+    pub tags: Option<Vec<String>>,
+    pub project: Option<String>,
 }
 
 pub struct Store {
     paths: StorePaths,
     data: DataFile,
+    device_id: String,
 }
 
 impl Store {
     pub fn new(app_data_path: PathBuf) -> Self {
         let paths = StorePaths::new(app_data_path);
         let _ = ensure_layout(&paths);
-        let legacy_data = read_json_file::<DataFile>(&paths.legacy_data_file).map(sanitize_data);
-        let data = read_data_files(&paths, legacy_data.as_ref());
+        let device_id = read_or_create_device_id(&paths).unwrap_or_else(|_| new_device_id());
+        let legacy_data = read_json_file::<DataFile>(&paths.legacy_data_file).map(|data| sanitize_data(data, &device_id));
+        let data = read_data_files(&paths, legacy_data.as_ref(), &device_id);
         if write_storage_files(&paths, &data).is_ok() && legacy_data.is_some() {
             let _ = fs::remove_file(&paths.legacy_data_file);
         }
-        Self { paths, data }
+        Self { paths, data, device_id }
     }
 
     pub fn list_notes(&self, date: Option<String>) -> Vec<Note> {
@@ -159,7 +197,7 @@ impl Store {
             .data
             .notes
             .iter()
-            .filter(|note| note.date == wanted_date)
+            .filter(|note| note.date == wanted_date && note.deleted_at.is_none())
             .cloned()
             .collect();
         notes.sort_by(|left, right| left.created_at.cmp(&right.created_at));
@@ -169,47 +207,86 @@ impl Store {
     pub fn add_note(&mut self, input: NoteInput) -> Result<Note, String> {
         let content = clean_string(input.content).ok_or_else(|| "事项内容不能为空".to_string())?;
         let timestamp = now_iso();
+        let (project, tags) = derive_note_metadata(&content, input.project, input.tags);
         let note = Note {
             id: Uuid::new_v4().to_string(),
             content,
             category: normalize_category(&input.category),
             date: sanitize_date_or_today(input.date),
+            tags,
+            project,
             created_at: timestamp.clone(),
             updated_at: timestamp,
+            deleted_at: None,
+            revision: default_revision(),
+            updated_by: self.device_id.clone(),
         };
         self.data.notes.push(note.clone());
         self.persist()?;
+        self.append_note_change("note_created", &note)?;
         Ok(note)
     }
 
     pub fn update_note(&mut self, id: String, patch: NotePatch) -> Result<Note, String> {
-        let note = self
+        let index = self
             .data
             .notes
-            .iter_mut()
-            .find(|item| item.id == id)
+            .iter()
+            .position(|item| item.id == id && item.deleted_at.is_none())
             .ok_or_else(|| "事项不存在".to_string())?;
 
-        if let Some(content) = patch.content {
-            note.content = clean_string(content).ok_or_else(|| "事项内容不能为空".to_string())?;
+        let content_changed = patch.content.is_some();
+        let project_changed = patch.project.is_some();
+        let tags_changed = patch.tags.is_some();
+        let project_patch = patch.project.unwrap_or_default();
+        let tags_patch = patch.tags.unwrap_or_default();
+        let parsed_tags = patch.content.as_deref().map(parse_leading_tags).unwrap_or_default();
+
+        {
+            let note = &mut self.data.notes[index];
+            if let Some(content) = patch.content {
+                note.content = clean_string(content).ok_or_else(|| "事项内容不能为空".to_string())?;
+            }
+            if let Some(category) = patch.category {
+                note.category = normalize_category(&category);
+            }
+            if project_changed || tags_changed {
+                let project_input = if project_changed { project_patch } else { note.project.clone() };
+                let tags_input = if tags_changed { tags_patch } else { note.tags.clone() };
+                let (project, tags) = derive_note_metadata(&note.content, project_input, tags_input);
+                note.project = project;
+                note.tags = tags;
+            } else if content_changed && !parsed_tags.is_empty() {
+                note.project = parsed_tags[0].clone();
+                note.tags = parsed_tags;
+            }
+            note.revision = note.revision.saturating_add(1).max(default_revision() + 1);
+            note.updated_at = now_iso();
+            note.updated_by = self.device_id.clone();
         }
-        if let Some(category) = patch.category {
-            note.category = normalize_category(&category);
-        }
-        note.updated_at = now_iso();
-        let updated = note.clone();
+
+        let updated = self.data.notes[index].clone();
         self.persist()?;
+        self.append_note_change("note_updated", &updated)?;
         Ok(updated)
     }
 
     pub fn delete_note(&mut self, id: String) -> Result<bool, String> {
-        let before = self.data.notes.len();
-        self.data.notes.retain(|note| note.id != id);
-        let changed = self.data.notes.len() != before;
-        if changed {
-            self.persist()?;
+        let Some(index) = self.data.notes.iter().position(|note| note.id == id && note.deleted_at.is_none()) else {
+            return Ok(false);
+        };
+        {
+            let note = &mut self.data.notes[index];
+            let timestamp = now_iso();
+            note.deleted_at = Some(timestamp.clone());
+            note.updated_at = timestamp;
+            note.revision = note.revision.saturating_add(1).max(default_revision() + 1);
+            note.updated_by = self.device_id.clone();
         }
-        Ok(changed)
+        let deleted = self.data.notes[index].clone();
+        self.persist()?;
+        self.append_note_change("note_deleted", &deleted)?;
+        Ok(true)
     }
 
     pub fn get_settings(&self) -> Settings {
@@ -234,8 +311,22 @@ impl Store {
     }
 
     fn persist(&mut self) -> Result<(), String> {
-        self.data = sanitize_data(self.data.clone());
+        self.data = sanitize_data(self.data.clone(), &self.device_id);
         write_storage_files(&self.paths, &self.data)
+    }
+
+    fn append_note_change(&self, operation: &str, note: &Note) -> Result<(), String> {
+        append_change_record(
+            &self.paths,
+            &self.device_id,
+            ChangeRecord {
+                entity_type: "note".to_string(),
+                entity_id: note.id.clone(),
+                operation: operation.to_string(),
+                revision: note.revision,
+                changed_at: now_iso(),
+            },
+        )
     }
 }
 
@@ -254,6 +345,7 @@ impl StorePaths {
             ai_settings_file: sync_settings_dir.join("ai.json"),
             reminder_settings_file: sync_settings_dir.join("reminder.json"),
             secrets_file: local_data_dir.join("secrets.json"),
+            device_file: local_data_dir.join("device.json"),
             sync_settings_dir,
             local_data_dir,
             app_dir,
@@ -270,6 +362,10 @@ fn normalize_app_data_dir(path: PathBuf) -> PathBuf {
 }
 
 fn default_schema_version() -> u32 {
+    1
+}
+
+fn default_revision() -> u32 {
     1
 }
 
@@ -304,7 +400,25 @@ fn ensure_layout(paths: &StorePaths) -> Result<(), String> {
     Ok(())
 }
 
-fn read_data_files(paths: &StorePaths, legacy_data: Option<&DataFile>) -> DataFile {
+fn read_or_create_device_id(paths: &StorePaths) -> Result<String, String> {
+    let device_id = read_json_file::<DeviceFile>(&paths.device_file)
+        .and_then(|file| clean_string(file.device_id))
+        .unwrap_or_else(new_device_id);
+    write_json_file(
+        &paths.device_file,
+        &DeviceFile {
+            schema_version: default_schema_version(),
+            device_id: device_id.clone(),
+        },
+    )?;
+    Ok(device_id)
+}
+
+fn new_device_id() -> String {
+    format!("device_{}", Uuid::new_v4())
+}
+
+fn read_data_files(paths: &StorePaths, legacy_data: Option<&DataFile>, device_id: &str) -> DataFile {
     let fallback = legacy_data.cloned().unwrap_or_else(default_data);
     let settings = read_settings(paths, &fallback.settings);
     let (split_notes, has_note_files) = read_note_files(paths);
@@ -313,7 +427,7 @@ fn read_data_files(paths: &StorePaths, legacy_data: Option<&DataFile>) -> DataFi
     } else {
         split_notes
     };
-    sanitize_data(DataFile { notes, settings })
+    sanitize_data(DataFile { notes, settings }, device_id)
 }
 
 fn read_settings(paths: &StorePaths, fallback: &Settings) -> Settings {
@@ -428,6 +542,19 @@ fn write_note_files(paths: &StorePaths, notes: &[Note]) -> Result<(), String> {
     Ok(())
 }
 
+fn append_change_record(paths: &StorePaths, device_id: &str, record: ChangeRecord) -> Result<(), String> {
+    let month = month_key_from_iso(&record.changed_at).unwrap_or_else(to_month_key);
+    let change_dir = paths.changes_dir.join(device_id);
+    fs::create_dir_all(&change_dir).map_err(|error| error.to_string())?;
+    let line = serde_json::to_string(&record).map_err(|error| error.to_string())? + "\n";
+    let mut file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(change_dir.join(format!("{month}.jsonl")))
+        .map_err(|error| error.to_string())?;
+    file.write_all(line.as_bytes()).map_err(|error| error.to_string())
+}
+
 fn is_reminder_time(value: &str) -> bool {
     let bytes = value.as_bytes();
     if bytes.len() != 5 || bytes[2] != b':' {
@@ -453,20 +580,26 @@ pub fn sanitize_settings(input: Settings) -> Settings {
     }
 }
 
-fn sanitize_data(input: DataFile) -> DataFile {
+fn sanitize_data(input: DataFile, device_id: &str) -> DataFile {
     let mut data = default_data();
     data.notes = input
         .notes
         .into_iter()
         .filter_map(|note| {
             let content = clean_string(note.content)?;
+            let (project, tags) = derive_note_metadata(&content, note.project, note.tags);
             Some(Note {
                 id: clean_string(note.id).unwrap_or_else(|| Uuid::new_v4().to_string()),
                 content,
                 category: normalize_category(&note.category),
                 date: sanitize_date_or_today(note.date),
+                tags,
+                project,
                 created_at: clean_string(note.created_at).unwrap_or_else(now_iso),
                 updated_at: clean_string(note.updated_at).unwrap_or_else(now_iso),
+                deleted_at: clean_optional_string(note.deleted_at),
+                revision: note.revision.max(default_revision()),
+                updated_by: clean_string(note.updated_by).unwrap_or_else(|| device_id.to_string()),
             })
         })
         .collect();
@@ -519,6 +652,52 @@ fn temp_json_path(file_path: &Path) -> PathBuf {
     file_path.with_extension(format!("{extension}.tmp"))
 }
 
+fn derive_note_metadata(content: &str, project: String, tags: Vec<String>) -> (String, Vec<String>) {
+    let mut cleaned_tags = sanitize_tags(tags);
+    let parsed_tags = parse_leading_tags(content);
+    if cleaned_tags.is_empty() {
+        cleaned_tags = parsed_tags;
+    }
+
+    let cleaned_project = clean_project(project).or_else(|| cleaned_tags.first().cloned()).unwrap_or_default();
+    if !cleaned_project.is_empty() && !cleaned_tags.iter().any(|tag| tag == &cleaned_project) {
+        cleaned_tags.insert(0, cleaned_project.clone());
+    }
+    (cleaned_project, cleaned_tags)
+}
+
+fn parse_leading_tags(content: &str) -> Vec<String> {
+    let mut tags = Vec::new();
+    for token in content.split_whitespace() {
+        let Some(raw_tag) = token.strip_prefix('#') else {
+            break;
+        };
+        let Some(tag) = clean_project(raw_tag.to_string()) else {
+            break;
+        };
+        if !tags.iter().any(|item| item == &tag) {
+            tags.push(tag);
+        }
+    }
+    tags
+}
+
+fn sanitize_tags(tags: Vec<String>) -> Vec<String> {
+    let mut cleaned = Vec::new();
+    for tag in tags {
+        if let Some(value) = clean_project(tag) {
+            if !cleaned.iter().any(|item| item == &value) {
+                cleaned.push(value);
+            }
+        }
+    }
+    cleaned
+}
+
+fn clean_project(value: String) -> Option<String> {
+    clean_string(value.trim_start_matches('#').to_string())
+}
+
 pub fn normalize_category(value: &str) -> String {
     let trimmed = value.trim();
     if CATEGORIES.contains(&trimmed) {
@@ -535,6 +714,10 @@ fn clean_string(value: String) -> Option<String> {
     } else {
         Some(trimmed)
     }
+}
+
+fn clean_optional_string(value: Option<String>) -> Option<String> {
+    value.and_then(clean_string)
 }
 
 fn is_date_key(value: &str) -> bool {
@@ -556,9 +739,23 @@ fn sanitize_date_or_today(value: String) -> String {
     }
 }
 
+fn month_key_from_iso(value: &str) -> Option<String> {
+    let prefix = value.get(0..7)?;
+    if prefix.len() == 7 && prefix.as_bytes()[4] == b'-' {
+        Some(prefix.to_string())
+    } else {
+        None
+    }
+}
+
 pub fn to_date_key() -> String {
     let now = Local::now();
     format!("{:04}-{:02}-{:02}", now.year(), now.month(), now.day())
+}
+
+fn to_month_key() -> String {
+    let now = Local::now();
+    format!("{:04}-{:02}", now.year(), now.month())
 }
 
 pub fn now_iso() -> String {

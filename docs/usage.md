@@ -29,9 +29,11 @@
 
 应用数据位于 Tauri 应用数据目录：
 
-- `sync-data/notes/`：按日期保存事项 JSON。
+- `sync-data/notes/`：按日期保存事项 JSON，包含项目、标签、版本号、本机更新标识和软删除时间。
 - `sync-data/settings/`：保存 AI 地址、模型名、提醒时间等可同步设置。
+- `sync-data/changes/<deviceId>/`：按月份追加保存事项创建、更新、删除记录。
 - `local-data/secrets.json`：只保存 API Key，不放入同步目录。
+- `local-data/device.json`：保存本机 `deviceId`，用于写入事项 `updatedBy` 和变更日志目录。
 - JSON 写入使用临时文件替换正式文件，减少同步工具读取到不完整文件的概率。
 
 ## 6. 运行环境
