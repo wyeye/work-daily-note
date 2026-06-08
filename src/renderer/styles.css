@@ -1,14 +1,16 @@
 :root {
   color-scheme: light;
-  --bg: #f4f6fb;
-  --card: #ffffff;
-  --text: #172033;
-  --muted: #667085;
-  --line: #d9e0ea;
-  --primary: #1f6feb;
-  --primary-dark: #1759c4;
-  --danger: #d92d20;
-  --shadow: 0 12px 30px rgba(16, 24, 40, 0.08);
+  --bg: #F0FDFA;
+  --card: #FFFFFF;
+  --text: #134E4A;
+  --muted: #4B6F6B;
+  --line: #BFEDE7;
+  --primary: #0D9488;
+  --secondary: #14B8A6;
+  --action: #F97316;
+  --primary-dark: #0F766E;
+  --danger: #DC2626;
+  --shadow: 0 18px 44px rgba(19, 78, 74, 0.10);
 }
 
 * {
@@ -20,7 +22,7 @@ body {
   min-height: 100vh;
   font-family: "Microsoft YaHei", "Segoe UI", sans-serif;
   color: var(--text);
-  background: var(--bg);
+  background: radial-gradient(circle at top left, rgba(20, 184, 166, 0.18), transparent 34%), var(--bg);
 }
 
 button,
@@ -33,14 +35,14 @@ select {
 button {
   border: 0;
   border-radius: 10px;
-  background: var(--primary);
+  background: var(--action);
   color: #ffffff;
   padding: 10px 14px;
   cursor: pointer;
 }
 
 button:hover {
-  background: var(--primary-dark);
+  background: #ea580c;
 }
 
 button:disabled {
@@ -49,7 +51,7 @@ button:disabled {
 }
 
 button.secondary {
-  background: #edf2f7;
+  background: #E6FFFA;
   color: var(--text);
 }
 
@@ -63,6 +65,9 @@ button.danger {
   gap: 24px;
   align-items: center;
   padding: 24px 28px 10px;
+  border-bottom: 1px solid rgba(13, 148, 136, 0.16);
+  background: rgba(255, 255, 255, 0.62);
+  backdrop-filter: blur(14px);
 }
 
 .app-header h1 {
@@ -80,7 +85,8 @@ button.danger {
   gap: 8px;
   padding: 6px;
   border-radius: 14px;
-  background: #e9eef7;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(13, 148, 136, 0.16);
 }
 
 .tab {
@@ -142,7 +148,8 @@ input {
 textarea:focus,
 input:focus {
   border-color: var(--primary);
-  outline: none;
+  outline: 3px solid rgba(20, 184, 166, 0.28);
+  outline-offset: 2px;
 }
 
 .hint {
@@ -159,15 +166,15 @@ input:focus {
 }
 
 .category-pill {
-  background: #edf2f7;
+  background: #E6FFFA;
   color: var(--text);
   border: 1px solid transparent;
 }
 
 .category-pill.active {
-  background: #e8f1ff;
-  color: var(--primary);
-  border-color: #b9d3ff;
+  background: #CCFBF1;
+  color: var(--primary-dark);
+  border-color: var(--secondary);
 }
 
 .section-title {
@@ -221,7 +228,7 @@ input:focus {
 
 .summary-item {
   border-left: 4px solid var(--primary);
-  background: #f7faff;
+  background: #F0FDFA;
   border-radius: 10px;
   padding: 10px 12px;
 }
@@ -246,7 +253,7 @@ input:focus {
   position: fixed;
   right: 24px;
   bottom: 24px;
-  background: #101828;
+  background: #134E4A;
   color: #ffffff;
   padding: 10px 14px;
   border-radius: 10px;
@@ -263,6 +270,9 @@ input:focus {
 
 .record-view {
   min-height: calc(100vh - 130px);
+}
+
+.record-view.active {
   display: flex;
   flex-direction: column;
 }
@@ -339,7 +349,11 @@ button:focus-visible {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  #toast {
-    transition: none;
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0s !important;
+    animation-duration: 0s !important;
   }
 }
