@@ -13,3 +13,5 @@ docs/superpowers/
 .worktrees/
 
 src-tauri/target/
+
+src-tauri/gen/
