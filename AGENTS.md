@@ -23,6 +23,8 @@
 2. `package.json` 完成后，在 `engines.node` 记录支持版本。
 3. 升级 Node.js 或 npm 后，同步更新本节。
 
+4. Linux root 环境验证 Electron 启动时使用 `npm run start:linux-root`；Win11 正常使用 `npm start`。
+
 ## 国内源配置
 
 项目根目录使用 `.npmrc` 固定国内源：

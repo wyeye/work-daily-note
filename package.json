@@ -12,7 +12,8 @@
     "start": "electron .",
     "check": "node scripts/check-project.js",
     "pack:win": "electron-builder --win --dir",
-    "dist:win": "electron-builder --win nsis"
+    "dist:win": "electron-builder --win nsis",
+    "start:linux-root": "electron --no-sandbox ."
   },
   "build": {
     "appId": "com.wyeye.work-daily-note",

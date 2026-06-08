@@ -18,6 +18,16 @@ npm install
 npm start
 ```
 
+## Linux root 环境验证
+
+本仓库开发环境使用 root 用户时，Electron 需要关闭 Chromium sandbox 才能启动：
+
+```bash
+npm run start:linux-root
+```
+
+Win11 正常使用 `npm start`。
+
 ## 本地检查
 
 ```bash
