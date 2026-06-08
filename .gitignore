@@ -9,3 +9,5 @@ Thumbs.db
 docs/superpowers/
 
 .codegraph/
+
+.worktrees/
