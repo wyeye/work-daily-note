@@ -55,12 +55,21 @@ fn save_settings(state: State<'_, AppState>, settings: Settings) -> Result<store
 }
 
 #[tauri::command]
-async fn organize_daily_notes_command(state: State<'_, AppState>) -> Result<ai_client::OrganizeResult, String> {
+fn get_daily_result(state: State<'_, AppState>, date: Option<String>) -> Result<Option<store::DailyResult>, String> {
+    let store = state.store.lock().map_err(|_| "本地数据锁定失败".to_string())?;
+    Ok(store.get_daily_result(date))
+}
+
+#[tauri::command]
+async fn organize_daily_notes_command(state: State<'_, AppState>) -> Result<store::DailyResult, String> {
     let (settings, notes) = {
         let store = state.store.lock().map_err(|_| "本地数据锁定失败".to_string())?;
         (store.get_settings(), store.list_notes(None))
     };
-    ai_client::organize_daily_notes(settings, notes).await
+    let model = settings.model.trim().to_string();
+    let result = ai_client::organize_daily_notes(settings, notes.clone()).await?;
+    let mut store = state.store.lock().map_err(|_| "本地数据锁定失败".to_string())?;
+    store.save_daily_result(result, &notes, model)
 }
 
 #[tauri::command]
@@ -152,6 +161,7 @@ fn main() {
             delete_note,
             get_settings,
             save_settings,
+            get_daily_result,
             organize_daily_notes_command,
             write_clipboard,
             show_organizer

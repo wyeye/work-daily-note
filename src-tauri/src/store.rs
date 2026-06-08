@@ -67,6 +67,70 @@ pub struct SettingsWithCategories {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct CategorySummary {
+    #[serde(default)]
+    pub category: String,
+    #[serde(default)]
+    pub summary: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectSummary {
+    #[serde(default)]
+    pub project: String,
+    #[serde(default)]
+    pub summary: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OrganizeResult {
+    pub daily_text: String,
+    pub category_summaries: Vec<CategorySummary>,
+    pub project_summaries: Vec<ProjectSummary>,
+    pub tomorrow_plan: Vec<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DailyResult {
+    #[serde(default = "default_schema_version")]
+    pub schema_version: u32,
+    #[serde(default)]
+    pub date: String,
+    #[serde(default)]
+    pub daily_text: String,
+    #[serde(default)]
+    pub category_summaries: Vec<CategorySummary>,
+    #[serde(default)]
+    pub project_summaries: Vec<ProjectSummary>,
+    #[serde(default)]
+    pub tomorrow_plan: Vec<String>,
+    #[serde(default)]
+    pub source_note_ids: Vec<String>,
+    #[serde(default)]
+    pub source_revision_hash: String,
+    #[serde(default = "default_schema_version")]
+    pub template_version: u32,
+    #[serde(default = "default_schema_version")]
+    pub prompt_version: u32,
+    #[serde(default)]
+    pub model: String,
+    #[serde(default)]
+    pub generated_at: String,
+    #[serde(default)]
+    pub edited_at: String,
+    #[serde(default)]
+    pub updated_at: String,
+    #[serde(default)]
+    pub updated_by: String,
+    #[serde(default = "default_revision")]
+    pub revision: u32,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct DataFile {
     #[serde(default)]
     notes: Vec<Note>,
@@ -310,6 +374,59 @@ impl Store {
         Ok(self.get_settings_with_categories())
     }
 
+    pub fn get_daily_result(&self, date: Option<String>) -> Option<DailyResult> {
+        let date = sanitize_date_or_today(date.unwrap_or_default());
+        read_json_file::<DailyResult>(&self.paths.daily_results_dir.join(format!("{date}.json")))
+    }
+
+    pub fn save_daily_result(
+        &mut self,
+        result: OrganizeResult,
+        notes: &[Note],
+        model: String,
+    ) -> Result<DailyResult, String> {
+        if notes.is_empty() {
+            return Err("今天还没有事项可整理".to_string());
+        }
+        let date = notes.first().map(|note| note.date.clone()).unwrap_or_else(to_date_key);
+        let now = now_iso();
+        let result_file = self.paths.daily_results_dir.join(format!("{date}.json"));
+        let next_revision = read_json_file::<DailyResult>(&result_file)
+            .map(|existing| existing.revision.saturating_add(1).max(default_revision()))
+            .unwrap_or_else(default_revision);
+        let daily = DailyResult {
+            schema_version: default_schema_version(),
+            date: date.clone(),
+            daily_text: result.daily_text,
+            category_summaries: result.category_summaries,
+            project_summaries: result.project_summaries,
+            tomorrow_plan: result.tomorrow_plan,
+            source_note_ids: notes.iter().map(|note| note.id.clone()).collect(),
+            source_revision_hash: source_revision_hash(notes),
+            template_version: default_schema_version(),
+            prompt_version: default_schema_version(),
+            model: model.trim().to_string(),
+            generated_at: now.clone(),
+            edited_at: String::new(),
+            updated_at: now,
+            updated_by: self.device_id.clone(),
+            revision: next_revision,
+        };
+        write_json_file(&result_file, &daily)?;
+        append_change_record(
+            &self.paths,
+            &self.device_id,
+            ChangeRecord {
+                entity_type: "daily_result".to_string(),
+                entity_id: date,
+                operation: "result_generated".to_string(),
+                revision: daily.revision,
+                changed_at: now_iso(),
+            },
+        )?;
+        Ok(daily)
+    }
+
     fn persist(&mut self) -> Result<(), String> {
         self.data = sanitize_data(self.data.clone(), &self.device_id);
         write_storage_files(&self.paths, &self.data)
@@ -540,6 +657,28 @@ fn write_note_files(paths: &StorePaths, notes: &[Note]) -> Result<(), String> {
         )?;
     }
     Ok(())
+}
+
+fn source_revision_hash(notes: &[Note]) -> String {
+    let mut parts = notes
+        .iter()
+        .map(|note| {
+            format!(
+                "{}|{}|{}|{}",
+                note.id,
+                note.revision,
+                note.updated_at,
+                note.deleted_at.clone().unwrap_or_default()
+            )
+        })
+        .collect::<Vec<_>>();
+    parts.sort();
+    let mut hash = 0xcbf29ce484222325_u64;
+    for byte in parts.join("\n").as_bytes() {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    format!("{hash:016x}")
 }
 
 fn append_change_record(paths: &StorePaths, device_id: &str, record: ChangeRecord) -> Result<(), String> {

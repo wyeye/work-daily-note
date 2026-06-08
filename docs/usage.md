@@ -19,11 +19,11 @@
 
 到提醒时间后，应用弹出整理窗口。也可以从托盘菜单手动打开。
 
-点击“AI 整理今日事项”，生成禅道文本。
+点击“AI 整理今日事项”，生成结构化日报结果。日报文本、分类汇总、项目汇总和明日计划会保存到 `sync-data/results/daily/`。
 
 ## 4. 录入禅道
 
-点击“复制到剪贴板”，再手动复制到禅道对应输入框。应用不自动登录禅道，也不自动提交。
+点击“复制到剪贴板”，再手动粘贴到目标系统。应用不自动登录第三方系统，也不自动提交。
 
 ## 5. 本地数据
 
@@ -31,7 +31,8 @@
 
 - `sync-data/notes/`：按日期保存事项 JSON，包含项目、标签、版本号、本机更新标识和软删除时间。
 - `sync-data/settings/`：保存 AI 地址、模型名、提醒时间等可同步设置。
-- `sync-data/changes/<deviceId>/`：按月份追加保存事项创建、更新、删除记录。
+- `sync-data/results/daily/`：按日期保存整理结果，包含 `dailyText`、`categorySummaries`、`projectSummaries`、`tomorrowPlan`、来源事项 ID 和 `sourceRevisionHash`。
+- `sync-data/changes/<deviceId>/`：按月份追加保存事项创建、更新、删除和结果生成记录。
 - `local-data/secrets.json`：只保存 API Key，不放入同步目录。
 - `local-data/device.json`：保存本机 `deviceId`，用于写入事项 `updatedBy` 和变更日志目录。
 - JSON 写入使用临时文件替换正式文件，减少同步工具读取到不完整文件的概率。

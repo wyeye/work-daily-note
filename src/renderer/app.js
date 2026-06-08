@@ -11,6 +11,7 @@ const dailyNoteApi = {
   deleteNote: (id) => invoke('delete_note', { id }),
   getSettings: () => invoke('get_settings'),
   saveSettings: (settings) => invoke('save_settings', { settings }),
+  getDailyResult: (date) => invoke('get_daily_result', { date: date || null }),
   organize: () => invoke('organize_daily_notes_command'),
   writeClipboard: (text) => invoke('write_clipboard', { text }),
   showOrganizer: () => invoke('show_organizer'),
@@ -206,8 +207,8 @@ async function organizeToday() {
   elements.organizeButton.textContent = '整理中...';
   try {
     const result = await dailyNoteApi.organize();
-    state.resultText = result.zentaoText;
-    elements.resultText.value = result.zentaoText;
+    state.resultText = result.dailyText || '';
+    elements.resultText.value = result.dailyText || '';
     renderSummary(result.categorySummaries || []);
     showToast('整理完成');
   } catch (error) {

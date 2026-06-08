@@ -1,29 +1,16 @@
-use crate::store::{Note, Settings, CATEGORIES};
-use serde::{Deserialize, Serialize};
+use crate::store::{CategorySummary, Note, OrganizeResult, ProjectSummary, Settings, CATEGORIES};
+use serde::Deserialize;
 use serde_json::{json, Value};
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CategorySummary {
-    pub category: String,
-    pub summary: String,
-}
-
-#[derive(Clone, Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct OrganizeResult {
-    pub category_summaries: Vec<CategorySummary>,
-    pub zentao_text: String,
-    pub tomorrow_plan: Vec<String>,
-}
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct RawResult {
     #[serde(default)]
+    daily_text: String,
+    #[serde(default)]
     category_summaries: Vec<CategorySummary>,
     #[serde(default)]
-    zentao_text: String,
+    project_summaries: Vec<ProjectSummary>,
     #[serde(default)]
     tomorrow_plan: Vec<String>,
 }
@@ -71,7 +58,7 @@ pub async fn organize_daily_notes(settings: Settings, notes: Vec<Note>) -> Resul
         .ok_or_else(|| "AI 返回内容缺少 message.content".to_string())?;
 
     let raw = extract_json_object(content)?;
-    normalize_result(raw)
+    normalize_result(raw, &notes)
 }
 
 fn require_string(value: &str, message: &str) -> Result<String, String> {
@@ -108,7 +95,7 @@ fn extract_json_object(text: &str) -> Result<RawResult, String> {
     serde_json::from_str::<RawResult>(&trimmed[start..=end]).map_err(|_| "AI 返回内容不是 JSON".to_string())
 }
 
-fn normalize_result(raw: RawResult) -> Result<OrganizeResult, String> {
+fn normalize_result(raw: RawResult, notes: &[Note]) -> Result<OrganizeResult, String> {
     let category_summaries = raw
         .category_summaries
         .into_iter()
@@ -118,9 +105,19 @@ fn normalize_result(raw: RawResult) -> Result<OrganizeResult, String> {
         })
         .filter(|item| !item.category.is_empty() && !item.summary.is_empty())
         .collect::<Vec<_>>();
-    let zentao_text = raw.zentao_text.trim().to_string();
-    if zentao_text.is_empty() {
-        return Err("AI 返回内容缺少禅道文本".to_string());
+    let mut project_summaries = raw
+        .project_summaries
+        .into_iter()
+        .map(|item| ProjectSummary {
+            project: item.project.trim().to_string(),
+            summary: item.summary.trim().to_string(),
+        })
+        .filter(|item| !item.project.is_empty() && !item.summary.is_empty())
+        .collect::<Vec<_>>();
+    sort_projects_by_note_order(&mut project_summaries, notes);
+    let daily_text = raw.daily_text.trim().to_string();
+    if daily_text.is_empty() {
+        return Err("AI 返回内容缺少日报文本".to_string());
     }
     let tomorrow_plan = raw
         .tomorrow_plan
@@ -129,13 +126,38 @@ fn normalize_result(raw: RawResult) -> Result<OrganizeResult, String> {
         .filter(|item| !item.is_empty())
         .collect();
     Ok(OrganizeResult {
+        daily_text,
         category_summaries,
-        zentao_text,
+        project_summaries,
         tomorrow_plan,
     })
 }
 
+fn sort_projects_by_note_order(project_summaries: &mut [ProjectSummary], notes: &[Note]) {
+    let project_order = note_project_order(notes);
+    project_summaries.sort_by_key(|item| {
+        project_order
+            .iter()
+            .position(|project| project == &item.project)
+            .unwrap_or(usize::MAX)
+    });
+}
+
+fn note_project_order(notes: &[Note]) -> Vec<String> {
+    let mut projects = Vec::new();
+    for note in notes {
+        if note.project.trim().is_empty() {
+            continue;
+        }
+        if !projects.iter().any(|project| project == &note.project) {
+            projects.push(note.project.clone());
+        }
+    }
+    projects
+}
+
 fn build_prompt(notes: &[Note]) -> String {
+    let project_order = note_project_order(notes);
     let note_lines = notes
         .iter()
         .enumerate()
@@ -145,22 +167,34 @@ fn build_prompt(notes: &[Note]) -> String {
             } else {
                 note.category.trim().to_string()
             };
-            format!("{}. 【{}】{}", index + 1, category, note.content)
+            let project = if note.project.trim().is_empty() { "未指定" } else { note.project.trim() };
+            let tags = if note.tags.is_empty() { "无".to_string() } else { note.tags.join("、") };
+            format!(
+                "{}. 项目={}；标签={}；分类={}；revision={}；内容={}",
+                index + 1,
+                project,
+                tags,
+                category,
+                note.revision,
+                note.content
+            )
         })
         .collect::<Vec<_>>()
         .join("\n");
 
     [
-        "你是日报整理助手。请根据用户当天零散工作事项，整理为适合复制到禅道的日报文本。".to_string(),
-        "要求：".to_string(),
-        "1. 不编造未出现的事实。".to_string(),
-        "2. 按工作类型归并，不写流水账。".to_string(),
-        "3. 语气客观简洁。".to_string(),
-        "4. 输出 JSON，不输出 Markdown。".to_string(),
-        format!("5. 工作类型只能从这些分类选择：{}", CATEGORIES.join("、")),
-        "JSON 字段：categorySummaries 数组，每项包含 category 和 summary；zentaoText 字符串；tomorrowPlan 字符串数组。".to_string(),
-        "".to_string(),
-        "当天事项：".to_string(),
+        "你是日报整理助手。请根据用户当天零散工作事项，整理结构化日报。".to_string(),
+        "日报模板：".to_string(),
+        "今日完成\n1. ...\n\n明日计划\n1. ...".to_string(),
+        "分类整理要求：".to_string(),
+        format!("- 工作类型只能从这些分类选择：{}", CATEGORIES.join("、")),
+        "- categorySummaries 每项包含 category 和 summary。".to_string(),
+        "项目整理要求：".to_string(),
+        format!("- 优先按用户项目线索顺序整理：{}", if project_order.is_empty() { "无".to_string() } else { project_order.join("、") }),
+        "- projectSummaries 每项包含 project 和 summary。".to_string(),
+        "输出 JSON，不输出 Markdown。".to_string(),
+        "JSON 字段：dailyText 字符串；categorySummaries 数组；projectSummaries 数组；tomorrowPlan 字符串数组。".to_string(),
+        "当天未删除事项：".to_string(),
         if note_lines.is_empty() { "无事项".to_string() } else { note_lines },
     ]
     .join("\n")
