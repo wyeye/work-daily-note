@@ -47,6 +47,17 @@ function updateCargoToml() {
   fs.writeFileSync(filePath, nextText, 'utf-8');
 }
 
+function updateCargoLock() {
+  const filePath = path.join(root, 'src-tauri/Cargo.lock');
+  const text = fs.readFileSync(filePath, 'utf-8');
+  const versionPattern = /(\[\[package\]\]\s*name\s*=\s*"work-daily-note"\s*version\s*=\s*")[^"]+(")/m;
+  if (!versionPattern.test(text)) {
+    throw new Error('src-tauri/Cargo.lock package version field not found');
+  }
+  const nextText = text.replace(versionPattern, `$1${version}$2`);
+  fs.writeFileSync(filePath, nextText, 'utf-8');
+}
+
 function updateTauriConfig() {
   const data = readJson('src-tauri/tauri.conf.json');
   data.version = version;
@@ -56,6 +67,7 @@ function updateTauriConfig() {
 updatePackageJson();
 updatePackageLock();
 updateCargoToml();
+updateCargoLock();
 updateTauriConfig();
 
 console.log(`Version updated to ${version}`);

@@ -10,7 +10,7 @@ on:
 
 jobs:
   build-windows:
-    runs-on: windows-latest
+    runs-on: windows-2022
 
     steps:
       - name: Checkout
@@ -29,7 +29,7 @@ jobs:
         run: npm ci
 
       - name: Build Tauri Windows installer
-        run: npm run tauri:build
+        run: npm run tauri:build -- --verbose --ci
 
       - name: Upload bundle
         uses: actions/upload-artifact@v4
