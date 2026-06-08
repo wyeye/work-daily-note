@@ -23,6 +23,22 @@
 2. `package.json` 完成后，在 `engines.node` 记录支持版本。
 3. 升级 Node.js 或 npm 后，同步更新本节。
 
+## 国内源配置
+
+项目根目录使用 `.npmrc` 固定国内源：
+
+```ini
+registry=https://registry.npmmirror.com/
+electron_mirror=https://npmmirror.com/mirrors/electron/
+electron_builder_binaries_mirror=https://npmmirror.com/mirrors/electron-builder-binaries/
+```
+
+约定：
+
+1. 安装依赖和下载 Electron 二进制优先使用项目 `.npmrc`。
+2. 不在 `.npmrc` 写入 token、账号或私有源密钥。
+3. 如需临时切换源，只在本机环境变量或用户级 npm 配置处理，不提交真实凭据。
+
 ## 开发规范
 
 1. 使用 Electron + Node.js CommonJS，默认不引入前端框架。
