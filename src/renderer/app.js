@@ -37,6 +37,7 @@ const elements = {
   categoryOptions: document.getElementById('categoryOptions'),
   notesList: document.getElementById('notesList'),
   noteCount: document.getElementById('noteCount'),
+  projectHint: document.getElementById('projectHint'),
   organizeButton: document.getElementById('organizeButton'),
   summaryList: document.getElementById('summaryList'),
   resultText: document.getElementById('resultText'),
@@ -56,12 +57,49 @@ function showToast(message) {
   showToast.timer = window.setTimeout(() => elements.toast.classList.remove('show'), 1800);
 }
 
+function focusNoteInput() {
+  if (!elements.noteContent || !elements.views.notes.classList.contains('active')) {
+    return;
+  }
+  window.setTimeout(() => elements.noteContent.focus(), 0);
+}
+
+function parseNoteMetadata(content) {
+  const tags = [];
+  for (const token of content.trim().split(/\s+/)) {
+    if (!token.startsWith('#') || token.length === 1) {
+      break;
+    }
+    const tag = token.slice(1).trim();
+    if (tag && !tags.includes(tag)) {
+      tags.push(tag);
+    }
+  }
+  return {
+    project: tags[0] || '',
+    tags
+  };
+}
+
+function renderProjectHint() {
+  const metadata = parseNoteMetadata(elements.noteContent.value);
+  if (!metadata.project) {
+    elements.projectHint.textContent = '未识别项目标签';
+    elements.projectHint.classList.remove('active');
+    return;
+  }
+  elements.projectHint.textContent = `#${metadata.project}`;
+  elements.projectHint.classList.add('active');
+}
+
 function setRoute(route) {
   const nextRoute = elements.views[route] ? route : 'notes';
   elements.tabs.forEach((tab) => tab.classList.toggle('active', tab.dataset.route === nextRoute));
   Object.entries(elements.views).forEach(([name, view]) => view.classList.toggle('active', name === nextRoute));
   if (nextRoute === 'notes') {
-    loadNotes().catch((error) => showToast(error.message || '加载事项失败'));
+    loadNotes()
+      .then(focusNoteInput)
+      .catch((error) => showToast(error.message || '加载事项失败'));
   }
 }
 
@@ -94,14 +132,14 @@ function renderNotes() {
   elements.noteCount.textContent = `${state.notes.length} 条`;
   if (state.notes.length === 0) {
     const empty = document.createElement('p');
-    empty.className = 'note-meta';
-    empty.textContent = '今天还没有记录。';
+    empty.className = 'chat-empty';
+    empty.textContent = '输入第一条事项，今天的记录会像聊天一样显示在这里。';
     elements.notesList.appendChild(empty);
     return;
   }
   state.notes.forEach((note) => {
     const item = document.createElement('article');
-    item.className = 'note-item';
+    item.className = 'note-item note-bubble';
 
     const body = document.createElement('div');
     const content = document.createElement('p');
@@ -109,7 +147,9 @@ function renderNotes() {
     content.textContent = note.content;
     const meta = document.createElement('div');
     meta.className = 'note-meta';
-    meta.textContent = `${note.category || '未分类'} · ${note.createdAt.slice(11, 16)}`;
+    const project = note.project ? `#${note.project}` : '未指定项目';
+    const tags = Array.isArray(note.tags) && note.tags.length ? ` · ${note.tags.map((tag) => `#${tag}`).join(' ')}` : '';
+    meta.textContent = `${project}${tags} · ${note.category || '未分类'} · ${note.createdAt.slice(11, 16)}`;
     body.append(content, meta);
 
     const actions = document.createElement('div');
@@ -141,16 +181,21 @@ async function addNote(event) {
   const content = elements.noteContent.value.trim();
   if (!content) {
     showToast('请输入事项内容');
+    focusNoteInput();
     return;
   }
+  const metadata = parseNoteMetadata(content);
   try {
-    await dailyNoteApi.addNote({ content, category: state.selectedCategory });
+    await dailyNoteApi.addNote({ content, category: state.selectedCategory, project: metadata.project, tags: metadata.tags });
     elements.noteContent.value = '';
     state.selectedCategory = '';
     renderCategories();
+    renderProjectHint();
     await loadNotes();
+    focusNoteInput();
     showToast('已保存');
   } catch (error) {
+    focusNoteInput();
     showToast(error.message || '保存失败');
   }
 }
@@ -165,11 +210,14 @@ async function editNote(note) {
     showToast('事项内容不能为空');
     return;
   }
+  const metadata = parseNoteMetadata(content);
   try {
-    await dailyNoteApi.updateNote(note.id, { content, category: note.category });
+    await dailyNoteApi.updateNote(note.id, { content, category: note.category, project: metadata.project, tags: metadata.tags });
     await loadNotes();
+    focusNoteInput();
     showToast('已更新');
   } catch (error) {
+    focusNoteInput();
     showToast(error.message || '更新失败');
   }
 }
@@ -182,8 +230,10 @@ async function deleteNote(note) {
   try {
     await dailyNoteApi.deleteNote(note.id);
     await loadNotes();
+    focusNoteInput();
     showToast('已删除');
   } catch (error) {
+    focusNoteInput();
     showToast(error.message || '删除失败');
   }
 }
@@ -261,6 +311,7 @@ async function saveSettings(event) {
 function bindEvents() {
   elements.tabs.forEach((tab) => tab.addEventListener('click', () => setRoute(tab.dataset.route)));
   elements.noteForm.addEventListener('submit', addNote);
+  elements.noteContent.addEventListener('input', renderProjectHint);
   elements.noteContent.addEventListener('keydown', (event) => {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
@@ -280,6 +331,8 @@ async function boot() {
   await loadSettings();
   await loadNotes();
   setRoute('notes');
+  renderProjectHint();
+  focusNoteInput();
 }
 
 boot().catch((error) => showToast(error.message || '应用初始化失败'));

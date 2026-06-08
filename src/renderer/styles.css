@@ -260,3 +260,86 @@ input:focus {
   opacity: 1;
   transform: translateY(0);
 }
+
+.record-view {
+  min-height: calc(100vh - 130px);
+  display: flex;
+  flex-direction: column;
+}
+
+.record-panel {
+  flex: 1;
+  min-height: 360px;
+}
+
+.record-title .hint {
+  margin-top: 6px;
+}
+
+.note-count {
+  background: #e0f2f1;
+  color: #0f766e;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-weight: 700;
+}
+
+.chat-list {
+  align-content: start;
+  max-height: calc(100vh - 360px);
+  overflow: auto;
+  padding: 4px 4px 10px;
+}
+
+.chat-empty {
+  margin: 30px auto;
+  max-width: 360px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.note-bubble {
+  max-width: 760px;
+  margin-left: auto;
+  background: linear-gradient(180deg, #ffffff 0%, #f0fdfa 100%);
+  border-color: rgba(20, 184, 166, 0.26);
+  border-bottom-right-radius: 6px;
+}
+
+.composer-card {
+  position: sticky;
+  bottom: 18px;
+  z-index: 5;
+  border-color: rgba(13, 148, 136, 0.22);
+}
+
+.project-hint {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  margin-bottom: 10px;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: var(--muted);
+  padding: 5px 10px;
+  font-size: 12px;
+}
+
+.project-hint.active {
+  background: #ffedd5;
+  color: #c2410c;
+  font-weight: 700;
+}
+
+textarea:focus,
+input:focus,
+button:focus-visible {
+  outline: 3px solid rgba(20, 184, 166, 0.3);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #toast {
+    transition: none;
+  }
+}

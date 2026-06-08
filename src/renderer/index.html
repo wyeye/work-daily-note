@@ -20,24 +20,28 @@
   </header>
 
   <main>
-    <section id="notesView" class="view active">
-      <form id="noteForm" class="card input-card">
+    <section id="notesView" class="view active record-view">
+      <section class="record-panel card">
+        <div class="section-title record-title">
+          <div>
+            <h2>今日事项流</h2>
+            <p class="hint">打开即写，输入 `#项目名 内容` 可自动识别项目标签。</p>
+          </div>
+          <span id="noteCount" class="note-count">0 条</span>
+        </div>
+        <div id="notesList" class="notes-list chat-list" aria-live="polite"></div>
+      </section>
+
+      <form id="noteForm" class="card input-card composer-card">
         <label for="noteContent">快速记录</label>
+        <div id="projectHint" class="project-hint" aria-live="polite">未识别项目标签</div>
         <div class="note-input-row">
-          <textarea id="noteContent" rows="3" placeholder="例如：帮同事排查接口报错，定位到参数问题"></textarea>
+          <textarea id="noteContent" rows="2" placeholder="例如：#移动端 调整列表筛选"></textarea>
           <button type="submit">保存</button>
         </div>
-        <p class="hint">按 Enter 保存，按 Shift + Enter 换行。</p>
+        <p class="hint">Enter 保存，Shift + Enter 换行。保存失败时会保留输入。</p>
         <div class="category-row" id="categoryOptions"></div>
       </form>
-
-      <section class="card">
-        <div class="section-title">
-          <h2>今日事项</h2>
-          <span id="noteCount">0 条</span>
-        </div>
-        <div id="notesList" class="notes-list"></div>
-      </section>
     </section>
 
     <section id="organizeView" class="view">
