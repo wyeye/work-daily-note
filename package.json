@@ -1,0 +1,42 @@
+{
+  "name": "work-daily-note",
+  "version": "0.1.0",
+  "description": "Win11 desktop note app for organizing daily work notes into ZenTao-ready text.",
+  "main": "src/main/main.js",
+  "private": true,
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "electron .",
+    "check": "node scripts/check-project.js",
+    "pack:win": "electron-builder --win --dir",
+    "dist:win": "electron-builder --win nsis"
+  },
+  "build": {
+    "appId": "com.wyeye.work-daily-note",
+    "productName": "Work Daily Note",
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  },
+  "devDependencies": {
+    "electron": "^42.3.3",
+    "electron-builder": "^26.15.2"
+  }
+}
