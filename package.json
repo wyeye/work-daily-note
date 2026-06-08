@@ -28,7 +28,8 @@
     "win": {
       "target": [
         "nsis"
-      ]
+      ],
+      "icon": "src/assets/icons/app.ico"
     },
     "nsis": {
       "oneClick": false,

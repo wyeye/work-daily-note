@@ -16,6 +16,15 @@ const requiredFiles = [
   'src/renderer/index.html',
   'src/renderer/styles.css',
   'src/renderer/app.js',
+  'src/assets/icons/app.svg',
+  'src/assets/icons/app.png',
+  'src/assets/icons/app-16.png',
+  'src/assets/icons/app-32.png',
+  'src/assets/icons/app-48.png',
+  'src/assets/icons/app-64.png',
+  'src/assets/icons/app-128.png',
+  'src/assets/icons/app-256.png',
+  'src/assets/icons/app.ico',
   'README.md',
   'docs/usage.md'
 ];
@@ -32,6 +41,22 @@ for (const channel of ['notes:list', 'notes:add', 'notes:update', 'notes:delete'
   if (!mainText.includes(channel)) {
     throw new Error(`missing IPC channel: ${channel}`);
   }
+}
+
+for (const snippet of [
+  "APP_ICON_PATH = path.join(__dirname, '../assets/icons/app.png')",
+  "TRAY_ICON_PATH = path.join(__dirname, '../assets/icons/app-16.png')",
+  'icon: APP_ICON_PATH',
+  'nativeImage.createFromPath(TRAY_ICON_PATH)'
+]) {
+  if (!mainText.includes(snippet)) {
+    throw new Error(`missing icon wiring: ${snippet}`);
+  }
+}
+
+const packageConfig = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf-8'));
+if (packageConfig.build?.win?.icon !== 'src/assets/icons/app.ico') {
+  throw new Error('missing Windows build icon: src/assets/icons/app.ico');
 }
 
 const preloadText = fs.readFileSync(path.join(root, 'src/main/preload.js'), 'utf-8');

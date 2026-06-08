@@ -8,7 +8,8 @@ const { createStore } = require('./store');
 const { organizeDailyNotes } = require('./aiClient');
 const { ReminderScheduler } = require('./reminder');
 
-const TRAY_ICON_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAPUlEQVR42mP8z8Dwn4ECwESJ5lEDRgYGBgYGJgYGBhYGJkYGBgYGBhYGBkaQBiYGBgYGBhRkgAAn58EBEoYdB9AAAAAASUVORK5CYII=';
+const APP_ICON_PATH = path.join(__dirname, '../assets/icons/app.png');
+const TRAY_ICON_PATH = path.join(__dirname, '../assets/icons/app-16.png');
 
 let mainWindow = null;
 let tray = null;
@@ -23,6 +24,7 @@ function createMainWindow() {
     minHeight: 620,
     show: false,
     title: 'Work Daily Note',
+    icon: APP_ICON_PATH,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -57,7 +59,7 @@ function showWindow(route = 'notes') {
 }
 
 function createTray() {
-  const icon = nativeImage.createFromDataURL(TRAY_ICON_DATA_URL);
+  const icon = nativeImage.createFromPath(TRAY_ICON_PATH);
   tray = new Tray(icon);
   tray.setToolTip('Work Daily Note');
   tray.setContextMenu(Menu.buildFromTemplate([
@@ -74,7 +76,8 @@ function showReminder() {
   if (Notification.isSupported()) {
     new Notification({
       title: 'Work Daily Note',
-      body: '到时间整理今日事项了'
+      body: '到时间整理今日事项了',
+      icon: APP_ICON_PATH
     }).show();
   }
 }
