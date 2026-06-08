@@ -24,3 +24,7 @@
 ## 4. 录入禅道
 
 点击“复制到剪贴板”，再手动复制到禅道对应输入框。应用不自动登录禅道，也不自动提交。
+
+## 5. 运行环境
+
+新版应用使用 Tauri + WebView2。Win11 通常已包含 WebView2 Runtime；缺失时需要安装 Microsoft WebView2 Runtime 后再启动应用。

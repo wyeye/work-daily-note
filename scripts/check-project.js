@@ -6,13 +6,14 @@ const path = require('path');
 const root = path.resolve(__dirname, '..');
 const requiredFiles = [
   'package.json',
-  'src/shared/categories.js',
-  'src/shared/dates.js',
-  'src/main/store.js',
-  'src/main/aiClient.js',
-  'src/main/reminder.js',
-  'src/main/main.js',
-  'src/main/preload.js',
+  'src-tauri/Cargo.toml',
+  'src-tauri/tauri.conf.json',
+  'src-tauri/capabilities/default.json',
+  'src-tauri/icons/icon.png',
+  'src-tauri/src/main.rs',
+  'src-tauri/src/store.rs',
+  'src-tauri/src/ai_client.rs',
+  'src-tauri/src/reminder.rs',
   'src/renderer/index.html',
   'src/renderer/styles.css',
   'src/renderer/app.js',
@@ -36,34 +37,45 @@ for (const relative of requiredFiles) {
   }
 }
 
-const mainText = fs.readFileSync(path.join(root, 'src/main/main.js'), 'utf-8');
-for (const channel of ['notes:list', 'notes:add', 'notes:update', 'notes:delete', 'settings:get', 'settings:save', 'ai:organize', 'clipboard:write']) {
-  if (!mainText.includes(channel)) {
-    throw new Error(`missing IPC channel: ${channel}`);
+if (fs.existsSync(path.join(root, 'src', 'main'))) {
+  throw new Error('electron main directory should be removed');
+}
+
+const packageJson = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf-8'));
+for (const scriptName of ['check', 'tauri:dev', 'tauri:build']) {
+  if (!packageJson.scripts || !packageJson.scripts[scriptName]) {
+    throw new Error(`missing package script: ${scriptName}`);
+  }
+}
+if ((packageJson.devDependencies || {}).electron || (packageJson.devDependencies || {})['electron-builder']) {
+  throw new Error('electron dependencies should be removed after Tauri migration');
+}
+
+const tauriConfigText = fs.readFileSync(path.join(root, 'src-tauri/tauri.conf.json'), 'utf-8');
+for (const iconPath of ['../src/assets/icons/app.ico', '../src/assets/icons/app.png', '../src/assets/icons/app-256.png']) {
+  if (!tauriConfigText.includes(iconPath)) {
+    throw new Error(`missing Tauri icon config: ${iconPath}`);
   }
 }
 
-for (const snippet of [
-  "APP_ICON_PATH = path.join(__dirname, '../assets/icons/app.png')",
-  "TRAY_ICON_PATH = path.join(__dirname, '../assets/icons/app-16.png')",
-  'icon: APP_ICON_PATH',
-  'nativeImage.createFromPath(TRAY_ICON_PATH)'
-]) {
-  if (!mainText.includes(snippet)) {
-    throw new Error(`missing icon wiring: ${snippet}`);
+const mainText = fs.readFileSync(path.join(root, 'src-tauri/src/main.rs'), 'utf-8');
+for (const commandName of ['list_notes', 'add_note', 'update_note', 'delete_note', 'get_settings', 'save_settings', 'organize_daily_notes_command', 'write_clipboard', 'show_organizer']) {
+  if (!mainText.includes(commandName)) {
+    throw new Error(`missing Tauri command: ${commandName}`);
   }
 }
-
-const packageConfig = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf-8'));
-if (packageConfig.build?.win?.icon !== 'src/assets/icons/app.ico') {
-  throw new Error('missing Windows build icon: src/assets/icons/app.ico');
+if (!mainText.includes('include_bytes!("../../src/assets/icons/app-16.png")')) {
+  throw new Error('missing Tauri tray icon wiring: app-16.png');
 }
 
-const preloadText = fs.readFileSync(path.join(root, 'src/main/preload.js'), 'utf-8');
-for (const apiName of ['listNotes', 'addNote', 'updateNote', 'deleteNote', 'getSettings', 'saveSettings', 'organize', 'writeClipboard', 'onRouteSet']) {
-  if (!preloadText.includes(apiName)) {
-    throw new Error(`missing preload api: ${apiName}`);
+const rendererText = fs.readFileSync(path.join(root, 'src/renderer/app.js'), 'utf-8');
+for (const commandName of ['list_notes', 'add_note', 'update_note', 'delete_note', 'get_settings', 'save_settings', 'organize_daily_notes_command', 'write_clipboard']) {
+  if (!rendererText.includes(commandName)) {
+    throw new Error(`renderer missing invoke command: ${commandName}`);
   }
+}
+if (rendererText.includes('window.dailyNote')) {
+  throw new Error('renderer should not use Electron bridge API');
 }
 
 const htmlText = fs.readFileSync(path.join(root, 'src/renderer/index.html'), 'utf-8');

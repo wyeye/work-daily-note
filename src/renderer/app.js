@@ -1,5 +1,22 @@
 'use strict';
 
+const tauri = window.__TAURI__;
+const invoke = tauri.core.invoke;
+const listen = tauri.event.listen;
+
+const dailyNoteApi = {
+  listNotes: (date) => invoke('list_notes', { date: date || null }),
+  addNote: (note) => invoke('add_note', { note }),
+  updateNote: (id, patch) => invoke('update_note', { id, patch }),
+  deleteNote: (id) => invoke('delete_note', { id }),
+  getSettings: () => invoke('get_settings'),
+  saveSettings: (settings) => invoke('save_settings', { settings }),
+  organize: () => invoke('organize_daily_notes_command'),
+  writeClipboard: (text) => invoke('write_clipboard', { text }),
+  showOrganizer: () => invoke('show_organizer'),
+  onRouteSet: (callback) => listen('route:set', (event) => callback(event.payload))
+};
+
 const state = {
   notes: [],
   categories: [],
@@ -114,7 +131,7 @@ function renderNotes() {
 }
 
 async function loadNotes() {
-  state.notes = await window.dailyNote.listNotes();
+  state.notes = await dailyNoteApi.listNotes();
   renderNotes();
 }
 
@@ -126,7 +143,7 @@ async function addNote(event) {
     return;
   }
   try {
-    await window.dailyNote.addNote({ content, category: state.selectedCategory });
+    await dailyNoteApi.addNote({ content, category: state.selectedCategory });
     elements.noteContent.value = '';
     state.selectedCategory = '';
     renderCategories();
@@ -148,7 +165,7 @@ async function editNote(note) {
     return;
   }
   try {
-    await window.dailyNote.updateNote(note.id, { content, category: note.category });
+    await dailyNoteApi.updateNote(note.id, { content, category: note.category });
     await loadNotes();
     showToast('已更新');
   } catch (error) {
@@ -162,7 +179,7 @@ async function deleteNote(note) {
     return;
   }
   try {
-    await window.dailyNote.deleteNote(note.id);
+    await dailyNoteApi.deleteNote(note.id);
     await loadNotes();
     showToast('已删除');
   } catch (error) {
@@ -188,7 +205,7 @@ async function organizeToday() {
   elements.organizeButton.disabled = true;
   elements.organizeButton.textContent = '整理中...';
   try {
-    const result = await window.dailyNote.organize();
+    const result = await dailyNoteApi.organize();
     state.resultText = result.zentaoText;
     elements.resultText.value = result.zentaoText;
     renderSummary(result.categorySummaries || []);
@@ -208,7 +225,7 @@ async function copyResult() {
     return;
   }
   try {
-    await window.dailyNote.writeClipboard(text);
+    await dailyNoteApi.writeClipboard(text);
     showToast('已复制');
   } catch (error) {
     showToast(error.message || '复制失败');
@@ -216,7 +233,7 @@ async function copyResult() {
 }
 
 async function loadSettings() {
-  const settings = await window.dailyNote.getSettings();
+  const settings = await dailyNoteApi.getSettings();
   state.categories = settings.categories || [];
   elements.apiBaseUrl.value = settings.apiBaseUrl || '';
   elements.apiKey.value = settings.apiKey || '';
@@ -228,7 +245,7 @@ async function loadSettings() {
 async function saveSettings(event) {
   event.preventDefault();
   try {
-    await window.dailyNote.saveSettings({
+    await dailyNoteApi.saveSettings({
       apiBaseUrl: elements.apiBaseUrl.value,
       apiKey: elements.apiKey.value,
       model: elements.model.value,
@@ -252,8 +269,8 @@ function bindEvents() {
   elements.settingsForm.addEventListener('submit', saveSettings);
   elements.organizeButton.addEventListener('click', organizeToday);
   elements.copyButton.addEventListener('click', copyResult);
-  if (window.dailyNote.onRouteSet) {
-    window.dailyNote.onRouteSet((route) => setRoute(route));
+  if (dailyNoteApi.onRouteSet) {
+    dailyNoteApi.onRouteSet((route) => setRoute(route));
   }
 }
 
