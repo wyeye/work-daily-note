@@ -18,12 +18,25 @@ const dailyNoteApi = {
   onRouteSet: (callback) => listen('route:set', (event) => callback(event.payload))
 };
 
+const DEFAULT_SETTINGS = {
+  apiBaseUrl: '',
+  apiKey: '',
+  model: '',
+  reminderTime: '18:00',
+  dailyTemplate: '今日完成\n1. ...\n\n明日计划\n1. ...',
+  projectRules: '#项目名 优先，其余由 AI 自动识别',
+  startupPage: 'notes',
+  enterBehavior: 'save',
+  reminderStrategy: 'confirm',
+  categories: []
+};
+
 const state = {
   notes: [],
   categories: [],
   selectedCategory: '',
   resultText: '',
-  settings: {},
+  settings: { ...DEFAULT_SETTINGS },
   dailyResult: null,
   activeResultTab: 'daily'
 };
@@ -55,6 +68,14 @@ const elements = {
   apiKey: document.getElementById('apiKey'),
   model: document.getElementById('model'),
   reminderTime: document.getElementById('reminderTime'),
+  enterHint: document.getElementById('enterHint'),
+  advancedSettingsToggle: document.getElementById('advancedSettingsToggle'),
+  advancedSettingsPanel: document.getElementById('advancedSettingsPanel'),
+  dailyTemplate: document.getElementById('dailyTemplate'),
+  projectRules: document.getElementById('projectRules'),
+  startupPage: document.getElementById('startupPage'),
+  enterBehavior: document.getElementById('enterBehavior'),
+  reminderStrategy: document.getElementById('reminderStrategy'),
   toast: document.getElementById('toast')
 };
 
@@ -70,6 +91,100 @@ function focusNoteInput() {
     return;
   }
   window.setTimeout(() => elements.noteContent.focus(), 0);
+}
+
+function isReminderTime(value) {
+  return /^([01]\d|2[0-3]):[0-5]\d$/.test(value || '');
+}
+
+function normalizeReminderTime(value) {
+  return isReminderTime(value) ? value : DEFAULT_SETTINGS.reminderTime;
+}
+
+function normalizeChoice(value, allowed, fallback) {
+  return allowed.includes(value) ? value : fallback;
+}
+
+function textOrDefault(value, fallback) {
+  const text = (value || '').trim();
+  return text || fallback;
+}
+
+function normalizeSettings(settings = {}) {
+  const merged = { ...DEFAULT_SETTINGS, ...settings };
+  return {
+    ...merged,
+    reminderTime: normalizeReminderTime(merged.reminderTime),
+    dailyTemplate: textOrDefault(merged.dailyTemplate, DEFAULT_SETTINGS.dailyTemplate),
+    projectRules: textOrDefault(merged.projectRules, DEFAULT_SETTINGS.projectRules),
+    startupPage: normalizeChoice(merged.startupPage, ['notes', 'organize', 'settings'], DEFAULT_SETTINGS.startupPage),
+    enterBehavior: normalizeChoice(merged.enterBehavior, ['save', 'newline'], DEFAULT_SETTINGS.enterBehavior),
+    reminderStrategy: normalizeChoice(merged.reminderStrategy, ['confirm', 'organize', 'off'], DEFAULT_SETTINGS.reminderStrategy),
+    categories: Array.isArray(merged.categories) ? merged.categories : []
+  };
+}
+
+function updateEnterHint() {
+  if (state.settings.enterBehavior === 'newline') {
+    elements.enterHint.textContent = 'Enter 换行，Ctrl/⌘ + Enter 保存。保存失败时会保留输入。';
+  } else {
+    elements.enterHint.textContent = 'Enter 保存，Shift + Enter 换行。保存失败时会保留输入。';
+  }
+}
+
+function applySettingsToForm(settings) {
+  const normalized = normalizeSettings(settings);
+  state.settings = normalized;
+  state.categories = normalized.categories;
+  elements.apiBaseUrl.value = normalized.apiBaseUrl;
+  elements.apiKey.type = 'password';
+  elements.apiKey.value = normalized.apiKey;
+  elements.model.value = normalized.model;
+  elements.reminderTime.value = normalized.reminderTime;
+  elements.dailyTemplate.value = normalized.dailyTemplate;
+  elements.projectRules.value = normalized.projectRules;
+  elements.startupPage.value = normalized.startupPage;
+  elements.enterBehavior.value = normalized.enterBehavior;
+  elements.reminderStrategy.value = normalized.reminderStrategy;
+  updateEnterHint();
+  renderCategories();
+}
+
+function collectSettingsFromForm() {
+  return {
+    apiBaseUrl: elements.apiBaseUrl.value,
+    apiKey: elements.apiKey.value,
+    model: elements.model.value,
+    reminderTime: normalizeReminderTime(elements.reminderTime.value),
+    dailyTemplate: elements.dailyTemplate.value,
+    projectRules: elements.projectRules.value,
+    startupPage: elements.startupPage.value,
+    enterBehavior: elements.enterBehavior.value,
+    reminderStrategy: elements.reminderStrategy.value
+  };
+}
+
+function toggleAdvancedSettings(forceExpanded) {
+  const expanded = typeof forceExpanded === 'boolean' ? forceExpanded : elements.advancedSettingsPanel.hidden;
+  elements.advancedSettingsPanel.hidden = !expanded;
+  elements.advancedSettingsToggle.setAttribute('aria-expanded', String(expanded));
+}
+
+function handleNoteComposerKeydown(event) {
+  if (event.key !== 'Enter') {
+    return;
+  }
+  if (state.settings.enterBehavior === 'newline') {
+    if (event.ctrlKey || event.metaKey) {
+      event.preventDefault();
+      elements.noteForm.requestSubmit();
+    }
+    return;
+  }
+  if (!event.shiftKey) {
+    event.preventDefault();
+    elements.noteForm.requestSubmit();
+  }
 }
 
 function parseNoteMetadata(content) {
@@ -337,7 +452,7 @@ async function organizeToday() {
     setOrganizerStatus('今天还没有事项可整理');
     return;
   }
-  state.settings = await dailyNoteApi.getSettings();
+  state.settings = normalizeSettings(await dailyNoteApi.getSettings());
   if (!hasAiConfig()) {
     setOrganizerStatus('请先配置 AI 接口地址、API Key 和模型名');
     return;
@@ -377,25 +492,14 @@ async function copyResult() {
 
 async function loadSettings() {
   const settings = await dailyNoteApi.getSettings();
-  state.settings = settings;
-  state.categories = settings.categories || [];
-  elements.apiBaseUrl.value = settings.apiBaseUrl || '';
-  elements.apiKey.value = settings.apiKey || '';
-  elements.model.value = settings.model || '';
-  elements.reminderTime.value = settings.reminderTime || '18:00';
-  renderCategories();
+  applySettingsToForm(settings);
 }
 
 async function saveSettings(event) {
   event.preventDefault();
   try {
-    const saved = await dailyNoteApi.saveSettings({
-      apiBaseUrl: elements.apiBaseUrl.value,
-      apiKey: elements.apiKey.value,
-      model: elements.model.value,
-      reminderTime: elements.reminderTime.value || '18:00'
-    });
-    state.settings = saved;
+    const saved = await dailyNoteApi.saveSettings(collectSettingsFromForm());
+    applySettingsToForm(saved);
     showToast('设置已保存');
   } catch (error) {
     showToast(error.message || '设置保存失败');
@@ -406,12 +510,11 @@ function bindEvents() {
   elements.tabs.forEach((tab) => tab.addEventListener('click', () => setRoute(tab.dataset.route)));
   elements.noteForm.addEventListener('submit', addNote);
   elements.noteContent.addEventListener('input', renderProjectHint);
-  elements.noteContent.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter' && !event.shiftKey) {
-      event.preventDefault();
-      elements.noteForm.requestSubmit();
-    }
+  elements.noteContent.addEventListener('keydown', handleNoteComposerKeydown);
+  elements.reminderTime.addEventListener('blur', () => {
+    elements.reminderTime.value = normalizeReminderTime(elements.reminderTime.value);
   });
+  elements.advancedSettingsToggle.addEventListener('click', () => toggleAdvancedSettings());
   elements.settingsForm.addEventListener('submit', saveSettings);
   elements.organizeButton.addEventListener('click', organizeToday);
   elements.copyButton.addEventListener('click', copyResult);
@@ -426,7 +529,7 @@ async function boot() {
   await loadSettings();
   await loadNotes();
   await loadDailyResult();
-  setRoute('notes');
+  setRoute(state.settings.startupPage);
   renderProjectHint();
   focusNoteInput();
 }

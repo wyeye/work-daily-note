@@ -28,7 +28,7 @@ pub async fn organize_daily_notes(settings: Settings, notes: Vec<Note>) -> Resul
         "temperature": 0.2,
         "messages": [
             { "role": "system", "content": "你只返回合法 JSON。" },
-            { "role": "user", "content": build_prompt(&notes) }
+            { "role": "user", "content": build_prompt(&settings, &notes) }
         ]
     });
 
@@ -156,8 +156,10 @@ fn note_project_order(notes: &[Note]) -> Vec<String> {
     projects
 }
 
-fn build_prompt(notes: &[Note]) -> String {
+fn build_prompt(settings: &Settings, notes: &[Note]) -> String {
     let project_order = note_project_order(notes);
+    let daily_template = prompt_value(&settings.daily_template, "今日完成\n1. ...\n\n明日计划\n1. ...");
+    let project_rules = prompt_value(&settings.project_rules, "#项目名 优先，其余由 AI 自动识别");
     let note_lines = notes
         .iter()
         .enumerate()
@@ -185,7 +187,9 @@ fn build_prompt(notes: &[Note]) -> String {
     [
         "你是日报整理助手。请根据用户当天零散工作事项，整理结构化日报。".to_string(),
         "日报模板：".to_string(),
-        "今日完成\n1. ...\n\n明日计划\n1. ...".to_string(),
+        daily_template,
+        "项目识别规则：".to_string(),
+        project_rules,
         "分类整理要求：".to_string(),
         format!("- 工作类型只能从这些分类选择：{}", CATEGORIES.join("、")),
         "- categorySummaries 每项包含 category 和 summary。".to_string(),
@@ -198,4 +202,13 @@ fn build_prompt(notes: &[Note]) -> String {
         if note_lines.is_empty() { "无事项".to_string() } else { note_lines },
     ]
     .join("\n")
+}
+
+fn prompt_value(value: &str, fallback: &str) -> String {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        fallback.to_string()
+    } else {
+        trimmed.to_string()
+    }
 }

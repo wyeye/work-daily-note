@@ -136,7 +136,8 @@ main {
 }
 
 textarea,
-input {
+input,
+select {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 12px;
@@ -146,7 +147,8 @@ input {
 }
 
 textarea:focus,
-input:focus {
+input:focus,
+select:focus {
   border-color: var(--primary);
   outline: 3px solid rgba(20, 184, 166, 0.28);
   outline-offset: 2px;
@@ -247,6 +249,38 @@ input:focus {
   display: grid;
   gap: 10px;
   max-width: 720px;
+}
+
+.settings-section {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  border: 1px solid rgba(13, 148, 136, 0.18);
+  border-radius: 14px;
+  padding: 14px;
+}
+
+.settings-section legend {
+  padding: 0 6px;
+  color: var(--primary-dark);
+  font-weight: 800;
+}
+
+.advanced-toggle {
+  justify-self: start;
+}
+
+.advanced-settings {
+  display: grid;
+  gap: 10px;
+  border: 1px solid rgba(13, 148, 136, 0.18);
+  border-radius: 14px;
+  background: #F8FFFE;
+  padding: 14px;
+}
+
+.advanced-settings[hidden] {
+  display: none;
 }
 
 #toast {

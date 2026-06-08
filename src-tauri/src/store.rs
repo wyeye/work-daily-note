@@ -53,6 +53,16 @@ pub struct Settings {
     pub model: String,
     #[serde(default)]
     pub reminder_time: String,
+    #[serde(default = "default_daily_template")]
+    pub daily_template: String,
+    #[serde(default = "default_project_rules")]
+    pub project_rules: String,
+    #[serde(default = "default_startup_page")]
+    pub startup_page: String,
+    #[serde(default = "default_enter_behavior")]
+    pub enter_behavior: String,
+    #[serde(default = "default_reminder_strategy")]
+    pub reminder_strategy: String,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -62,6 +72,11 @@ pub struct SettingsWithCategories {
     pub api_key: String,
     pub model: String,
     pub reminder_time: String,
+    pub daily_template: String,
+    pub project_rules: String,
+    pub startup_page: String,
+    pub enter_behavior: String,
+    pub reminder_strategy: String,
     pub categories: Vec<String>,
 }
 
@@ -167,6 +182,30 @@ struct ReminderSettingsFile {
     schema_version: u32,
     #[serde(default)]
     reminder_time: String,
+    #[serde(default = "default_reminder_strategy")]
+    reminder_strategy: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct OrganizerSettingsFile {
+    #[serde(default = "default_schema_version")]
+    schema_version: u32,
+    #[serde(default = "default_daily_template")]
+    daily_template: String,
+    #[serde(default = "default_project_rules")]
+    project_rules: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct InteractionSettingsFile {
+    #[serde(default = "default_schema_version")]
+    schema_version: u32,
+    #[serde(default = "default_startup_page")]
+    startup_page: String,
+    #[serde(default = "default_enter_behavior")]
+    enter_behavior: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -209,6 +248,8 @@ struct StorePaths {
     legacy_data_file: PathBuf,
     ai_settings_file: PathBuf,
     reminder_settings_file: PathBuf,
+    organizer_settings_file: PathBuf,
+    interaction_settings_file: PathBuf,
     secrets_file: PathBuf,
     device_file: PathBuf,
 }
@@ -364,6 +405,11 @@ impl Store {
             api_key: settings.api_key,
             model: settings.model,
             reminder_time: settings.reminder_time,
+            daily_template: settings.daily_template,
+            project_rules: settings.project_rules,
+            startup_page: settings.startup_page,
+            enter_behavior: settings.enter_behavior,
+            reminder_strategy: settings.reminder_strategy,
             categories: CATEGORIES.iter().map(|item| item.to_string()).collect(),
         }
     }
@@ -461,6 +507,8 @@ impl StorePaths {
             legacy_data_file: app_dir.join("data.json"),
             ai_settings_file: sync_settings_dir.join("ai.json"),
             reminder_settings_file: sync_settings_dir.join("reminder.json"),
+            organizer_settings_file: sync_settings_dir.join("organizer.json"),
+            interaction_settings_file: sync_settings_dir.join("interaction.json"),
             secrets_file: local_data_dir.join("secrets.json"),
             device_file: local_data_dir.join("device.json"),
             sync_settings_dir,
@@ -492,7 +540,32 @@ fn default_settings() -> Settings {
         api_key: String::new(),
         model: String::new(),
         reminder_time: "18:00".to_string(),
+        daily_template: default_daily_template(),
+        project_rules: default_project_rules(),
+        startup_page: default_startup_page(),
+        enter_behavior: default_enter_behavior(),
+        reminder_strategy: default_reminder_strategy(),
     }
+}
+
+fn default_daily_template() -> String {
+    "今日完成\n1. ...\n\n明日计划\n1. ...".to_string()
+}
+
+fn default_project_rules() -> String {
+    "#项目名 优先，其余由 AI 自动识别".to_string()
+}
+
+fn default_startup_page() -> String {
+    "notes".to_string()
+}
+
+fn default_enter_behavior() -> String {
+    "save".to_string()
+}
+
+fn default_reminder_strategy() -> String {
+    "confirm".to_string()
 }
 
 fn default_data() -> DataFile {
@@ -556,6 +629,17 @@ fn read_settings(paths: &StorePaths, fallback: &Settings) -> Settings {
     let reminder_settings = read_json_file::<ReminderSettingsFile>(&paths.reminder_settings_file).unwrap_or_else(|| ReminderSettingsFile {
         schema_version: default_schema_version(),
         reminder_time: fallback.reminder_time.clone(),
+        reminder_strategy: fallback.reminder_strategy.clone(),
+    });
+    let organizer_settings = read_json_file::<OrganizerSettingsFile>(&paths.organizer_settings_file).unwrap_or_else(|| OrganizerSettingsFile {
+        schema_version: default_schema_version(),
+        daily_template: fallback.daily_template.clone(),
+        project_rules: fallback.project_rules.clone(),
+    });
+    let interaction_settings = read_json_file::<InteractionSettingsFile>(&paths.interaction_settings_file).unwrap_or_else(|| InteractionSettingsFile {
+        schema_version: default_schema_version(),
+        startup_page: fallback.startup_page.clone(),
+        enter_behavior: fallback.enter_behavior.clone(),
     });
     let secrets = read_json_file::<SecretsFile>(&paths.secrets_file).unwrap_or_else(|| SecretsFile {
         schema_version: default_schema_version(),
@@ -567,6 +651,11 @@ fn read_settings(paths: &StorePaths, fallback: &Settings) -> Settings {
         api_key: secrets.api_key,
         model: ai_settings.model,
         reminder_time: reminder_settings.reminder_time,
+        daily_template: organizer_settings.daily_template,
+        project_rules: organizer_settings.project_rules,
+        startup_page: interaction_settings.startup_page,
+        enter_behavior: interaction_settings.enter_behavior,
+        reminder_strategy: reminder_settings.reminder_strategy,
     })
 }
 
@@ -611,6 +700,23 @@ fn write_settings_files(paths: &StorePaths, settings: &Settings) -> Result<(), S
         &ReminderSettingsFile {
             schema_version: default_schema_version(),
             reminder_time: settings.reminder_time.clone(),
+            reminder_strategy: settings.reminder_strategy.clone(),
+        },
+    )?;
+    write_json_file(
+        &paths.organizer_settings_file,
+        &OrganizerSettingsFile {
+            schema_version: default_schema_version(),
+            daily_template: settings.daily_template.clone(),
+            project_rules: settings.project_rules.clone(),
+        },
+    )?;
+    write_json_file(
+        &paths.interaction_settings_file,
+        &InteractionSettingsFile {
+            schema_version: default_schema_version(),
+            startup_page: settings.startup_page.clone(),
+            enter_behavior: settings.enter_behavior.clone(),
         },
     )?;
     write_json_file(
@@ -716,6 +822,20 @@ pub fn sanitize_settings(input: Settings) -> Settings {
         } else {
             fallback.reminder_time
         },
+        daily_template: clean_string(input.daily_template).unwrap_or(fallback.daily_template),
+        project_rules: clean_string(input.project_rules).unwrap_or(fallback.project_rules),
+        startup_page: normalize_choice(input.startup_page, &["notes", "organize", "settings"], &fallback.startup_page),
+        enter_behavior: normalize_choice(input.enter_behavior, &["save", "newline"], &fallback.enter_behavior),
+        reminder_strategy: normalize_choice(input.reminder_strategy, &["confirm", "organize", "off"], &fallback.reminder_strategy),
+    }
+}
+
+fn normalize_choice(value: String, allowed: &[&str], fallback: &str) -> String {
+    let trimmed = value.trim();
+    if allowed.iter().any(|item| item == &trimmed) {
+        trimmed.to_string()
+    } else {
+        fallback.to_string()
     }
 }
 

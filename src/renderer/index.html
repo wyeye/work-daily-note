@@ -39,7 +39,7 @@
           <textarea id="noteContent" rows="2" placeholder="例如：#移动端 调整列表筛选"></textarea>
           <button type="submit">保存</button>
         </div>
-        <p class="hint">Enter 保存，Shift + Enter 换行。保存失败时会保留输入。</p>
+        <p id="enterHint" class="hint">Enter 保存，Shift + Enter 换行。保存失败时会保留输入。</p>
         <div class="category-row" id="categoryOptions"></div>
       </form>
     </section>
@@ -78,14 +78,41 @@
     <section id="settingsView" class="view">
       <form id="settingsForm" class="card settings-form">
         <h2>AI 与提醒设置</h2>
-        <label for="apiBaseUrl">OpenAI 兼容接口地址</label>
-        <input id="apiBaseUrl" type="url" placeholder="https://api.example.com/v1">
-        <label for="apiKey">API Key</label>
-        <input id="apiKey" type="password" autocomplete="off" placeholder="只保存在本机配置">
-        <label for="model">模型名</label>
-        <input id="model" type="text" placeholder="gpt-4.1-mini">
-        <label for="reminderTime">提醒时间</label>
-        <input id="reminderTime" type="time" value="18:00">
+        <fieldset class="settings-section">
+          <legend>基础设置</legend>
+          <label for="apiBaseUrl">OpenAI 兼容接口地址</label>
+          <input id="apiBaseUrl" type="url" placeholder="https://api.example.com/v1">
+          <label for="apiKey">API Key</label>
+          <input id="apiKey" type="password" autocomplete="off" placeholder="只保存在本机配置">
+          <label for="model">模型名</label>
+          <input id="model" type="text" placeholder="gpt-4.1-mini">
+          <label for="reminderTime">提醒时间</label>
+          <input id="reminderTime" type="time" value="18:00">
+        </fieldset>
+        <button id="advancedSettingsToggle" class="secondary advanced-toggle" type="button" aria-expanded="false" aria-controls="advancedSettingsPanel">高级设置</button>
+        <section id="advancedSettingsPanel" class="advanced-settings" hidden>
+          <label for="dailyTemplate">日报模板</label>
+          <textarea id="dailyTemplate" rows="5"></textarea>
+          <label for="projectRules">项目识别规则</label>
+          <textarea id="projectRules" rows="3"></textarea>
+          <label for="startupPage">启动页</label>
+          <select id="startupPage">
+            <option value="notes">记录</option>
+            <option value="organize">整理日报</option>
+            <option value="settings">设置</option>
+          </select>
+          <label for="enterBehavior">Enter 行为</label>
+          <select id="enterBehavior">
+            <option value="save">Enter 保存，Shift + Enter 换行</option>
+            <option value="newline">Enter 换行，Ctrl/⌘ + Enter 保存</option>
+          </select>
+          <label for="reminderStrategy">提醒策略</label>
+          <select id="reminderStrategy">
+            <option value="confirm">到点先确认今日事项</option>
+            <option value="organize">到点直接进入整理页</option>
+            <option value="off">关闭本机提醒</option>
+          </select>
+        </section>
         <button type="submit">保存设置</button>
       </form>
     </section>

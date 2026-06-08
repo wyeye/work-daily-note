@@ -11,6 +11,8 @@
 
 保存后，新的提醒时间立即生效。API Key 只保存在本机应用数据目录的 `local-data/secrets.json`。
 
+设置页默认只展示 AI 地址、API Key、模型名和提醒时间。点击“高级设置”后，可以编辑日报模板、项目识别规则、启动页、Enter 行为和提醒策略；API Key 默认以密码框隐藏，不完整展示。提醒时间格式异常时会回到 `18:00`。
+
 ## 2. 记录事项
 
 打开应用默认进入“记录”页，光标会自动进入底部输入框。输入一句话后按 Enter 保存，Shift + Enter 换行；也可以输入 `#项目名 内容`，应用会识别项目和标签。保存成功后输入框清空并继续聚焦，保存失败时保留原输入。
@@ -30,7 +32,7 @@
 应用数据位于 Tauri 应用数据目录：
 
 - `sync-data/notes/`：按日期保存事项 JSON，包含项目、标签、版本号、本机更新标识和软删除时间。
-- `sync-data/settings/`：保存 AI 地址、模型名、提醒时间等可同步设置。
+- `sync-data/settings/`：保存 AI 地址、模型名、提醒时间、日报模板、项目识别规则、启动页、Enter 行为和提醒策略等可同步设置。
 - `sync-data/results/daily/`：按日期保存整理结果，包含 `dailyText`、`categorySummaries`、`projectSummaries`、`tomorrowPlan`、来源事项 ID 和 `sourceRevisionHash`。
 - `sync-data/changes/<deviceId>/`：按月份追加保存事项创建、更新、删除和结果生成记录。
 - `local-data/secrets.json`：只保存 API Key，不放入同步目录。
