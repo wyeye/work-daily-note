@@ -357,3 +357,47 @@ button:focus-visible {
     animation-duration: 0s !important;
   }
 }
+
+.organize-status {
+  margin-top: 6px;
+}
+
+.stale-hint {
+  margin: 0 0 14px;
+  border: 1px solid rgba(249, 115, 22, 0.32);
+  border-radius: 12px;
+  background: #fff7ed;
+  color: #c2410c;
+  padding: 10px 12px;
+  font-weight: 700;
+}
+
+.result-tabs {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(13, 148, 136, 0.16);
+  padding: 6px;
+}
+
+.result-tab {
+  background: transparent;
+  color: var(--muted);
+}
+
+.result-tab.active {
+  background: #ffffff;
+  color: var(--primary);
+  box-shadow: 0 4px 12px rgba(19, 78, 74, 0.10);
+}
+
+.result-panel {
+  display: none;
+}
+
+.result-panel.active {
+  display: block;
+}

@@ -22,7 +22,10 @@ const state = {
   notes: [],
   categories: [],
   selectedCategory: '',
-  resultText: ''
+  resultText: '',
+  settings: {},
+  dailyResult: null,
+  activeResultTab: 'daily'
 };
 
 const elements = {
@@ -39,7 +42,12 @@ const elements = {
   noteCount: document.getElementById('noteCount'),
   projectHint: document.getElementById('projectHint'),
   organizeButton: document.getElementById('organizeButton'),
+  organizeStatus: document.getElementById('organizeStatus'),
+  staleHint: document.getElementById('staleHint'),
+  resultTabs: Array.from(document.querySelectorAll('.result-tab')),
+  resultPanels: Array.from(document.querySelectorAll('.result-panel')),
   summaryList: document.getElementById('summaryList'),
+  projectSummaryList: document.getElementById('projectSummaryList'),
   resultText: document.getElementById('resultText'),
   copyButton: document.getElementById('copyButton'),
   settingsForm: document.getElementById('settingsForm'),
@@ -100,6 +108,11 @@ function setRoute(route) {
     loadNotes()
       .then(focusNoteInput)
       .catch((error) => showToast(error.message || '加载事项失败'));
+  }
+  if (nextRoute === 'organize') {
+    loadNotes()
+      .then(loadDailyResult)
+      .catch((error) => setOrganizerStatus(error.message || '加载整理结果失败'));
   }
 }
 
@@ -174,6 +187,7 @@ function renderNotes() {
 async function loadNotes() {
   state.notes = await dailyNoteApi.listNotes();
   renderNotes();
+  updateStaleHint();
 }
 
 async function addNote(event) {
@@ -238,34 +252,110 @@ async function deleteNote(note) {
   }
 }
 
-function renderSummary(items) {
-  elements.summaryList.innerHTML = '';
+function renderSummaryList(container, items, titleKey) {
+  container.innerHTML = '';
+  if (!items || items.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'hint';
+    empty.textContent = '暂无内容';
+    container.appendChild(empty);
+    return;
+  }
   items.forEach((item) => {
     const box = document.createElement('div');
     box.className = 'summary-item';
     const title = document.createElement('strong');
-    title.textContent = item.category;
+    title.textContent = item[titleKey] || '未命名';
     const summary = document.createElement('p');
-    summary.textContent = item.summary;
+    summary.textContent = item.summary || '';
     box.append(title, summary);
-    elements.summaryList.appendChild(box);
+    container.appendChild(box);
   });
 }
 
+function renderSummary(items) {
+  renderSummaryList(elements.summaryList, items, 'category');
+}
+
+function setOrganizerStatus(message) {
+  elements.organizeStatus.textContent = message;
+}
+
+function hasAiConfig() {
+  return Boolean((state.settings.apiBaseUrl || '').trim() && (state.settings.apiKey || '').trim() && (state.settings.model || '').trim());
+}
+
+function sourceRevisionHash(notes) {
+  const parts = notes
+    .map((note) => `${note.id}|${note.revision || 1}|${note.updatedAt || ''}|${note.deletedAt || ''}`)
+    .sort()
+    .join('\n');
+  let hash = 0xcbf29ce484222325n;
+  for (const code of new TextEncoder().encode(parts)) {
+    hash ^= BigInt(code);
+    hash = BigInt.asUintN(64, hash * 0x100000001b3n);
+  }
+  return hash.toString(16).padStart(16, '0');
+}
+
+function updateStaleHint() {
+  if (!elements.staleHint || !state.dailyResult || !state.dailyResult.sourceRevisionHash) {
+    elements.staleHint.hidden = true;
+    return;
+  }
+  elements.staleHint.hidden = sourceRevisionHash(state.notes) === state.dailyResult.sourceRevisionHash;
+}
+
+function setResultTab(tab) {
+  state.activeResultTab = tab;
+  elements.resultTabs.forEach((button) => button.classList.toggle('active', button.dataset.resultTab === tab));
+  elements.resultPanels.forEach((panel) => panel.classList.toggle('active', panel.dataset.resultPanel === tab));
+}
+
+function renderOrganizerResult(result) {
+  state.dailyResult = result;
+  state.resultText = result && result.dailyText ? result.dailyText : '';
+  elements.resultText.value = state.resultText;
+  renderSummary(result ? result.categorySummaries || [] : []);
+  renderSummaryList(elements.projectSummaryList, result ? result.projectSummaries || [] : [], 'project');
+  setResultTab('daily');
+  updateStaleHint();
+}
+
+async function loadDailyResult() {
+  const result = await dailyNoteApi.getDailyResult();
+  if (result) {
+    renderOrganizerResult(result);
+  } else {
+    updateStaleHint();
+  }
+}
+
 async function organizeToday() {
+  await loadNotes();
+  if (state.notes.length === 0) {
+    setOrganizerStatus('今天还没有事项可整理');
+    return;
+  }
+  state.settings = await dailyNoteApi.getSettings();
+  if (!hasAiConfig()) {
+    setOrganizerStatus('请先配置 AI 接口地址、API Key 和模型名');
+    return;
+  }
   elements.organizeButton.disabled = true;
   elements.organizeButton.textContent = '整理中...';
+  setOrganizerStatus('整理中，请稍候');
   try {
     const result = await dailyNoteApi.organize();
-    state.resultText = result.dailyText || '';
-    elements.resultText.value = result.dailyText || '';
-    renderSummary(result.categorySummaries || []);
+    renderOrganizerResult(result);
+    setOrganizerStatus('整理完成');
     showToast('整理完成');
   } catch (error) {
+    setOrganizerStatus(error.message || '整理失败');
     showToast(error.message || '整理失败');
   } finally {
     elements.organizeButton.disabled = false;
-    elements.organizeButton.textContent = 'AI 整理今日事项';
+    elements.organizeButton.textContent = '开始整理';
   }
 }
 
@@ -277,14 +367,17 @@ async function copyResult() {
   }
   try {
     await dailyNoteApi.writeClipboard(text);
+    setOrganizerStatus('已复制');
     showToast('已复制');
   } catch (error) {
-    showToast(error.message || '复制失败');
+    setOrganizerStatus(`复制失败：${error.message || '未知错误'}`);
+    showToast('复制失败');
   }
 }
 
 async function loadSettings() {
   const settings = await dailyNoteApi.getSettings();
+  state.settings = settings;
   state.categories = settings.categories || [];
   elements.apiBaseUrl.value = settings.apiBaseUrl || '';
   elements.apiKey.value = settings.apiKey || '';
@@ -296,12 +389,13 @@ async function loadSettings() {
 async function saveSettings(event) {
   event.preventDefault();
   try {
-    await dailyNoteApi.saveSettings({
+    const saved = await dailyNoteApi.saveSettings({
       apiBaseUrl: elements.apiBaseUrl.value,
       apiKey: elements.apiKey.value,
       model: elements.model.value,
       reminderTime: elements.reminderTime.value || '18:00'
     });
+    state.settings = saved;
     showToast('设置已保存');
   } catch (error) {
     showToast(error.message || '设置保存失败');
@@ -321,6 +415,7 @@ function bindEvents() {
   elements.settingsForm.addEventListener('submit', saveSettings);
   elements.organizeButton.addEventListener('click', organizeToday);
   elements.copyButton.addEventListener('click', copyResult);
+  elements.resultTabs.forEach((button) => button.addEventListener('click', () => setResultTab(button.dataset.resultTab)));
   if (dailyNoteApi.onRouteSet) {
     dailyNoteApi.onRouteSet((route) => setRoute(route));
   }
@@ -330,6 +425,7 @@ async function boot() {
   bindEvents();
   await loadSettings();
   await loadNotes();
+  await loadDailyResult();
   setRoute('notes');
   renderProjectHint();
   focusNoteInput();

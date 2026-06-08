@@ -45,17 +45,33 @@
     </section>
 
     <section id="organizeView" class="view">
-      <section class="card">
+      <section class="card organize-card">
         <div class="section-title">
-          <h2>AI 整理</h2>
-          <button id="organizeButton" type="button">AI 整理今日事项</button>
+          <div>
+            <h2>整理日报</h2>
+            <p id="organizeStatus" class="hint organize-status" role="status" aria-live="polite">准备整理今日事项。</p>
+          </div>
+          <button id="organizeButton" type="button">开始整理</button>
         </div>
-        <div id="summaryList" class="summary-list"></div>
-        <label for="resultText">日报文本</label>
-        <textarea id="resultText" rows="12" readonly></textarea>
-        <div class="actions">
-          <button id="copyButton" type="button">复制到剪贴板</button>
+        <p id="staleHint" class="stale-hint" hidden>事项已变化，可重新整理</p>
+        <div class="result-tabs" role="tablist" aria-label="整理结果">
+          <button class="result-tab active" type="button" data-result-tab="daily">日报文本</button>
+          <button class="result-tab" type="button" data-result-tab="category">分类展示</button>
+          <button class="result-tab" type="button" data-result-tab="project">项目展示</button>
         </div>
+        <section id="dailyResultPanel" class="result-panel active" data-result-panel="daily">
+          <label for="resultText">日报文本</label>
+          <textarea id="resultText" rows="12" readonly></textarea>
+          <div class="actions">
+            <button id="copyButton" type="button">复制文本</button>
+          </div>
+        </section>
+        <section id="categoryResultPanel" class="result-panel" data-result-panel="category">
+          <div id="summaryList" class="summary-list"></div>
+        </section>
+        <section id="projectResultPanel" class="result-panel" data-result-panel="project">
+          <div id="projectSummaryList" class="summary-list"></div>
+        </section>
       </section>
     </section>
 
