@@ -9,7 +9,7 @@
 - 模型名，例如 `gpt-4.1-mini`
 - 提醒时间，默认 `18:00`
 
-保存后，新的提醒时间立即生效。
+保存后，新的提醒时间立即生效。API Key 只保存在本机应用数据目录的 `local-data/secrets.json`。
 
 ## 2. 记录事项
 
@@ -25,6 +25,15 @@
 
 点击“复制到剪贴板”，再手动复制到禅道对应输入框。应用不自动登录禅道，也不自动提交。
 
-## 5. 运行环境
+## 5. 本地数据
+
+应用数据位于 Tauri 应用数据目录：
+
+- `sync-data/notes/`：按日期保存事项 JSON。
+- `sync-data/settings/`：保存 AI 地址、模型名、提醒时间等可同步设置。
+- `local-data/secrets.json`：只保存 API Key，不放入同步目录。
+- JSON 写入使用临时文件替换正式文件，减少同步工具读取到不完整文件的概率。
+
+## 6. 运行环境
 
 新版应用使用 Tauri + WebView2。Win11 通常已包含 WebView2 Runtime；缺失时需要安装 Microsoft WebView2 Runtime 后再启动应用。

@@ -130,8 +130,7 @@ fn main() {
         .plugin(tauri_plugin_notification::init())
         .setup(|app| {
             let data_dir = app.path().app_data_dir()?;
-            let data_file = data_dir.join("data.json");
-            let store = Arc::new(Mutex::new(Store::new(data_file)));
+            let store = Arc::new(Mutex::new(Store::new(data_dir)));
             app.manage(AppState { store: store.clone() });
             setup_tray(app)?;
             let app_handle = app.handle().clone();
