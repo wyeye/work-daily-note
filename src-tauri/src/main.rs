@@ -79,6 +79,14 @@ fn write_clipboard(app: AppHandle, text: String) -> Result<bool, String> {
 }
 
 #[tauri::command]
+fn hide_window(app: AppHandle) -> Result<bool, String> {
+    if let Some(window) = app.get_webview_window("main") {
+        window.hide().map_err(|error| error.to_string())?;
+    }
+    Ok(true)
+}
+
+#[tauri::command]
 fn show_organizer(app: AppHandle) -> Result<bool, String> {
     show_window(&app, "organize")?;
     Ok(true)
@@ -164,6 +172,7 @@ fn main() {
             get_daily_result,
             organize_daily_notes_command,
             write_clipboard,
+            hide_window,
             show_organizer
         ])
         .run(tauri::generate_context!())

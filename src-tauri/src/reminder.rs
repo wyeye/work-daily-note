@@ -18,32 +18,36 @@ pub fn is_reminder_time(value: &str) -> bool {
 pub async fn start_reminder_loop(app: AppHandle, store: Arc<Mutex<Store>>) {
     let mut last_trigger = String::new();
     loop {
-        let reminder_time = store
+        let (reminder_time, reminder_strategy) = store
             .lock()
-            .map(|store| store.get_settings().reminder_time)
-            .unwrap_or_else(|_| "18:00".to_string());
+            .map(|store| {
+                let settings = store.get_settings();
+                (settings.reminder_time, settings.reminder_strategy)
+            })
+            .unwrap_or_else(|_| ("18:00".to_string(), "confirm".to_string()));
         let now = Local::now();
         let current_time = format!("{:02}:{:02}", now.hour(), now.minute());
         let trigger_key = format!("{} {}", to_date_key(), reminder_time);
-        if is_reminder_time(&reminder_time) && current_time == reminder_time && last_trigger != trigger_key {
+        if reminder_strategy != "off" && is_reminder_time(&reminder_time) && current_time == reminder_time && last_trigger != trigger_key {
             last_trigger = trigger_key;
-            show_reminder(&app);
+            show_reminder(&app, &reminder_strategy);
         }
         sleep(Duration::from_secs(30)).await;
     }
 }
 
-pub fn show_reminder(app: &AppHandle) {
+pub fn show_reminder(app: &AppHandle, reminder_strategy: &str) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.show();
         let _ = window.unminimize();
         let _ = window.set_focus();
     }
-    let _ = app.emit("route:set", "organize");
+    let route = if reminder_strategy == "organize" { "organize" } else { "reminder" };
+    let _ = app.emit("route:set", route);
     let _ = app
         .notification()
         .builder()
         .title("Work Daily Note")
-        .body("到时间整理今日事项了")
+        .body("到时间确认今日事项了")
         .show();
 }

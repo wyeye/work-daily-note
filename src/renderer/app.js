@@ -14,6 +14,7 @@ const dailyNoteApi = {
   getDailyResult: (date) => invoke('get_daily_result', { date: date || null }),
   organize: () => invoke('organize_daily_notes_command'),
   writeClipboard: (text) => invoke('write_clipboard', { text }),
+  hideWindow: () => invoke('hide_window'),
   showOrganizer: () => invoke('show_organizer'),
   onRouteSet: (callback) => listen('route:set', (event) => callback(event.payload))
 };
@@ -46,6 +47,7 @@ const elements = {
   views: {
     notes: document.getElementById('notesView'),
     organize: document.getElementById('organizeView'),
+    reminder: document.getElementById('reminderView'),
     settings: document.getElementById('settingsView')
   },
   noteForm: document.getElementById('noteForm'),
@@ -63,6 +65,9 @@ const elements = {
   projectSummaryList: document.getElementById('projectSummaryList'),
   resultText: document.getElementById('resultText'),
   copyButton: document.getElementById('copyButton'),
+  reminderNotesList: document.getElementById('reminderNotesList'),
+  reminderLaterButton: document.getElementById('reminderLaterButton'),
+  reminderStartButton: document.getElementById('reminderStartButton'),
   settingsForm: document.getElementById('settingsForm'),
   apiBaseUrl: document.getElementById('apiBaseUrl'),
   apiKey: document.getElementById('apiKey'),
@@ -229,6 +234,11 @@ function setRoute(route) {
       .then(loadDailyResult)
       .catch((error) => setOrganizerStatus(error.message || '加载整理结果失败'));
   }
+  if (nextRoute === 'reminder') {
+    loadNotes()
+      .then(renderReminderNotes)
+      .catch((error) => showToast(error.message || '加载提醒事项失败'));
+  }
 }
 
 function renderCategories() {
@@ -296,6 +306,31 @@ function renderNotes() {
 
     item.append(body, actions);
     elements.notesList.appendChild(item);
+  });
+}
+
+function renderReminderNotes() {
+  elements.reminderNotesList.innerHTML = '';
+  if (state.notes.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'chat-empty';
+    empty.textContent = '今天还没有事项。可以先回到记录页补充。';
+    elements.reminderNotesList.appendChild(empty);
+    return;
+  }
+  state.notes.forEach((note) => {
+    const item = document.createElement('article');
+    item.className = 'note-item reminder-note';
+    const content = document.createElement('p');
+    content.className = 'note-content';
+    content.textContent = note.content;
+    const meta = document.createElement('div');
+    meta.className = 'note-meta';
+    const project = note.project ? `#${note.project}` : '未指定项目';
+    const time = note.createdAt ? note.createdAt.slice(11, 16) : '--:--';
+    meta.textContent = `${project} · ${note.category || '未分类'} · ${time}`;
+    item.append(content, meta);
+    elements.reminderNotesList.appendChild(item);
   });
 }
 
@@ -490,6 +525,28 @@ async function copyResult() {
   }
 }
 
+async function startReminderOrganizing() {
+  elements.reminderStartButton.disabled = true;
+  elements.reminderStartButton.textContent = '整理中...';
+  setRoute('organize');
+  try {
+    await organizeToday();
+  } finally {
+    elements.reminderStartButton.disabled = false;
+    elements.reminderStartButton.textContent = '开始整理';
+  }
+}
+
+async function remindLater() {
+  try {
+    await dailyNoteApi.hideWindow();
+    showToast('稍后处理');
+  } catch (error) {
+    setRoute('notes');
+    showToast(error.message || '稍后处理');
+  }
+}
+
 async function loadSettings() {
   const settings = await dailyNoteApi.getSettings();
   applySettingsToForm(settings);
@@ -518,6 +575,8 @@ function bindEvents() {
   elements.settingsForm.addEventListener('submit', saveSettings);
   elements.organizeButton.addEventListener('click', organizeToday);
   elements.copyButton.addEventListener('click', copyResult);
+  elements.reminderStartButton.addEventListener('click', startReminderOrganizing);
+  elements.reminderLaterButton.addEventListener('click', remindLater);
   elements.resultTabs.forEach((button) => button.addEventListener('click', () => setResultTab(button.dataset.resultTab)));
   if (dailyNoteApi.onRouteSet) {
     dailyNoteApi.onRouteSet((route) => setRoute(route));

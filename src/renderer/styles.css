@@ -207,6 +207,10 @@ select:focus {
   padding: 12px;
 }
 
+.reminder-note {
+  display: block;
+}
+
 .note-content {
   margin: 0 0 8px;
   white-space: pre-wrap;
@@ -243,6 +247,18 @@ select:focus {
   margin-top: 12px;
   display: flex;
   justify-content: flex-end;
+}
+
+.reminder-card {
+  max-width: 760px;
+}
+
+.reminder-notes {
+  margin-top: 12px;
+}
+
+.reminder-actions {
+  gap: 10px;
 }
 
 .settings-form {
