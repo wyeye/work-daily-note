@@ -223,7 +223,8 @@ assertRequiredSnippets('renderer redesign', htmlText + rendererText, [
   'normalizeSettings',
   'renderReminderNotes'
 ]);
-assertRequiredSnippets('style redesign', styleText, ['#0D9488', '#14B8A6', '#F97316', 'prefers-reduced-motion', 'result-tabs', 'advanced-settings', 'reminder-card']);
+assertRequiredSnippets('style redesign', styleText, ['#0D9488', '#14B8A6', '#0F766E', 'prefers-reduced-motion', 'result-tabs', 'advanced-settings', 'reminder-card']);
+forbiddenRendererText(styleText, ['#F97316', '#ea580c', '249, 115, 22', '#fff7ed', '#c2410c', '#ffedd5'], 'style');
 assertRequiredSnippets('reminder routing', reminderText, ['reminder_strategy', 'route:set', 'reminder', 'organize', '到时间确认今日事项了']);
 runParserChecks();
 runJsonCompatibilityChecks(storeText);

@@ -7,7 +7,7 @@
   --line: #BFEDE7;
   --primary: #0D9488;
   --secondary: #14B8A6;
-  --action: #F97316;
+  --action: #0F766E;
   --primary-dark: #0F766E;
   --danger: #DC2626;
   --shadow: 0 18px 44px rgba(19, 78, 74, 0.10);
@@ -42,7 +42,7 @@ button {
 }
 
 button:hover {
-  background: #ea580c;
+  background: #115E59;
 }
 
 button:disabled {
@@ -119,6 +119,10 @@ main {
   box-shadow: var(--shadow);
   padding: 20px;
   margin-bottom: 18px;
+}
+
+.view.active:not(.record-view) > .card {
+  min-height: 560px;
 }
 
 .input-card label,
@@ -386,8 +390,8 @@ select:focus {
 }
 
 .project-hint.active {
-  background: #ffedd5;
-  color: #c2410c;
+  background: #CCFBF1;
+  color: var(--primary-dark);
   font-weight: 700;
 }
 
@@ -414,10 +418,10 @@ button:focus-visible {
 
 .stale-hint {
   margin: 0 0 14px;
-  border: 1px solid rgba(249, 115, 22, 0.32);
+  border: 1px solid rgba(13, 148, 136, 0.28);
   border-radius: 12px;
-  background: #fff7ed;
-  color: #c2410c;
+  background: #E6FFFA;
+  color: var(--primary-dark);
   padding: 10px 12px;
   font-weight: 700;
 }
@@ -446,8 +450,17 @@ button:focus-visible {
 
 .result-panel {
   display: none;
+  min-height: 460px;
 }
 
 .result-panel.active {
   display: block;
+}
+
+.result-panel .summary-list {
+  min-height: 336px;
+}
+
+#resultText {
+  min-height: 336px;
 }
