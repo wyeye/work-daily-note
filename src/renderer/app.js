@@ -35,7 +35,13 @@ const DEFAULT_SETTINGS = {
   startupPage: 'notes',
   enterBehavior: 'save',
   reminderStrategy: 'confirm',
-  categories: []
+  categories: [
+    '日常沟通与需求确认',
+    '问题排查与技术支持',
+    '开发与代码调整',
+    '测试验证与发布支持',
+    '文档、配置与环境维护'
+  ]
 };
 
 const state = {
@@ -87,6 +93,9 @@ const elements = {
   startupPage: document.getElementById('startupPage'),
   enterBehavior: document.getElementById('enterBehavior'),
   reminderStrategy: document.getElementById('reminderStrategy'),
+  categoryList: document.getElementById('categoryList'),
+  newCategoryInput: document.getElementById('newCategoryInput'),
+  addCategoryButton: document.getElementById('addCategoryButton'),
   appVersion: document.getElementById('appVersion'),
   checkUpdateButton: document.getElementById('checkUpdateButton'),
   updateStatus: document.getElementById('updateStatus'),
@@ -124,6 +133,29 @@ function textOrDefault(value, fallback) {
   return text || fallback;
 }
 
+function normalizeCategories(categories) {
+  const cleaned = [];
+  const source = Array.isArray(categories) ? categories : DEFAULT_SETTINGS.categories;
+  source.forEach((category) => {
+    const value = (category || '').trim();
+    if (value && value.length <= 24 && !cleaned.includes(value)) {
+      cleaned.push(value);
+    }
+  });
+  return cleaned.length ? cleaned : [...DEFAULT_SETTINGS.categories];
+}
+
+function formatNoteTime(value) {
+  if (!value) {
+    return '--:--';
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value.length >= 16 ? value.slice(11, 16) : '--:--';
+  }
+  return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
+}
+
 function normalizeSettings(settings = {}) {
   const merged = { ...DEFAULT_SETTINGS, ...settings };
   return {
@@ -134,7 +166,7 @@ function normalizeSettings(settings = {}) {
     startupPage: normalizeChoice(merged.startupPage, ['notes', 'organize', 'settings'], DEFAULT_SETTINGS.startupPage),
     enterBehavior: normalizeChoice(merged.enterBehavior, ['save', 'newline'], DEFAULT_SETTINGS.enterBehavior),
     reminderStrategy: normalizeChoice(merged.reminderStrategy, ['confirm', 'organize', 'off'], DEFAULT_SETTINGS.reminderStrategy),
-    categories: Array.isArray(merged.categories) ? merged.categories : []
+    categories: normalizeCategories(merged.categories)
   };
 }
 
@@ -162,6 +194,7 @@ function applySettingsToForm(settings) {
   elements.reminderStrategy.value = normalized.reminderStrategy;
   updateEnterHint();
   renderCategories();
+  renderCategoryManager();
 }
 
 function collectSettingsFromForm() {
@@ -174,7 +207,8 @@ function collectSettingsFromForm() {
     projectRules: elements.projectRules.value,
     startupPage: elements.startupPage.value,
     enterBehavior: elements.enterBehavior.value,
-    reminderStrategy: elements.reminderStrategy.value
+    reminderStrategy: elements.reminderStrategy.value,
+    categories: state.categories
   };
 }
 
@@ -252,10 +286,11 @@ function setRoute(route) {
 
 function renderCategories() {
   elements.categoryOptions.innerHTML = '';
+  elements.categoryOptions.classList.add('category-selector');
   const empty = document.createElement('button');
   empty.type = 'button';
   empty.className = `category-pill${state.selectedCategory === '' ? ' active' : ''}`;
-  empty.textContent = '不选分类';
+  empty.textContent = '未分类';
   empty.addEventListener('click', () => {
     state.selectedCategory = '';
     renderCategories();
@@ -272,6 +307,56 @@ function renderCategories() {
     });
     elements.categoryOptions.appendChild(button);
   });
+}
+
+function renderCategoryManager() {
+  elements.categoryList.innerHTML = '';
+  state.categories.forEach((category) => {
+    const item = document.createElement('div');
+    item.className = 'category-manage-item';
+    const name = document.createElement('span');
+    name.textContent = category;
+    const removeButton = document.createElement('button');
+    removeButton.type = 'button';
+    removeButton.className = 'secondary category-remove-button';
+    removeButton.textContent = '删除';
+    removeButton.addEventListener('click', () => removeCategory(category));
+    item.append(name, removeButton);
+    elements.categoryList.appendChild(item);
+  });
+}
+
+function addCategoryFromInput() {
+  const value = elements.newCategoryInput.value.trim();
+  if (!value) {
+    showToast('请输入分类名称');
+    return;
+  }
+  if (value.length > 24) {
+    showToast('分类名称最多 24 个字符');
+    return;
+  }
+  if (state.categories.includes(value)) {
+    showToast('分类已存在');
+    return;
+  }
+  state.categories = [...state.categories, value];
+  elements.newCategoryInput.value = '';
+  renderCategories();
+  renderCategoryManager();
+}
+
+function removeCategory(category) {
+  if (state.categories.length <= 1) {
+    showToast('至少保留一个分类');
+    return;
+  }
+  state.categories = state.categories.filter((item) => item !== category);
+  if (state.selectedCategory === category) {
+    state.selectedCategory = '';
+  }
+  renderCategories();
+  renderCategoryManager();
 }
 
 function renderNotes() {
@@ -296,7 +381,7 @@ function renderNotes() {
     meta.className = 'note-meta';
     const project = note.project ? `#${note.project}` : '未指定项目';
     const tags = Array.isArray(note.tags) && note.tags.length ? ` · ${note.tags.map((tag) => `#${tag}`).join(' ')}` : '';
-    meta.textContent = `${project}${tags} · ${note.category || '未分类'} · ${note.createdAt.slice(11, 16)}`;
+    meta.textContent = `${project}${tags} · ${note.category || '未分类'} · ${formatNoteTime(note.createdAt)}`;
     body.append(content, meta);
 
     const actions = document.createElement('div');
@@ -336,7 +421,7 @@ function renderReminderNotes() {
     const meta = document.createElement('div');
     meta.className = 'note-meta';
     const project = note.project ? `#${note.project}` : '未指定项目';
-    const time = note.createdAt ? note.createdAt.slice(11, 16) : '--:--';
+    const time = formatNoteTime(note.createdAt);
     meta.textContent = `${project} · ${note.category || '未分类'} · ${time}`;
     item.append(content, meta);
     elements.reminderNotesList.appendChild(item);
@@ -648,6 +733,13 @@ function bindEvents() {
   elements.advancedSettingsToggle.addEventListener('click', () => toggleAdvancedSettings());
   elements.settingsForm.addEventListener('submit', saveSettings);
   elements.checkUpdateButton.addEventListener('click', handleCheckUpdate);
+  elements.addCategoryButton.addEventListener('click', addCategoryFromInput);
+  elements.newCategoryInput.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      addCategoryFromInput();
+    }
+  });
   elements.organizeButton.addEventListener('click', organizeToday);
   elements.copyButton.addEventListener('click', copyResult);
   elements.reminderStartButton.addEventListener('click', startReminderOrganizing);

@@ -171,16 +171,32 @@ select:focus {
   margin-top: 12px;
 }
 
+.category-selector {
+  border: 1px solid rgba(13, 148, 136, 0.18);
+  border-radius: 14px;
+  background: #F8FFFE;
+  padding: 8px;
+}
+
 .category-pill {
+  border: 1px solid rgba(13, 148, 136, 0.18);
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--muted);
+  padding: 7px 11px;
+  transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+}
+
+.category-pill:hover {
   background: #E6FFFA;
-  color: var(--text);
-  border: 1px solid transparent;
+  color: var(--primary-dark);
 }
 
 .category-pill.active {
   background: #CCFBF1;
   color: var(--primary-dark);
   border-color: var(--secondary);
+  font-weight: 800;
 }
 
 .section-title {
@@ -268,7 +284,7 @@ select:focus {
 .settings-form {
   display: grid;
   gap: 10px;
-  max-width: 720px;
+  width: 100%;
 }
 
 .settings-section {
@@ -305,6 +321,38 @@ select:focus {
 .update-actions {
   justify-content: flex-start;
   margin-top: 0;
+}
+
+.category-manage-section {
+  gap: 12px;
+}
+
+.category-manage-input {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+}
+
+.category-manage-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.category-manage-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgba(13, 148, 136, 0.18);
+  border-radius: 999px;
+  background: #F8FFFE;
+  padding: 6px 8px 6px 12px;
+}
+
+.category-remove-button {
+  padding: 5px 9px;
+  border-radius: 999px;
+  font-size: 12px;
 }
 
 .advanced-toggle {

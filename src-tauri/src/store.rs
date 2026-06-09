@@ -1,4 +1,4 @@
-use chrono::{Datelike, Local, Utc};
+use chrono::{Datelike, Local};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
@@ -63,6 +63,8 @@ pub struct Settings {
     pub enter_behavior: String,
     #[serde(default = "default_reminder_strategy")]
     pub reminder_strategy: String,
+    #[serde(default = "default_categories")]
+    pub categories: Vec<String>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -210,6 +212,15 @@ struct InteractionSettingsFile {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
+struct CategoriesSettingsFile {
+    #[serde(default = "default_schema_version")]
+    schema_version: u32,
+    #[serde(default = "default_categories")]
+    categories: Vec<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct SecretsFile {
     #[serde(default = "default_schema_version")]
     schema_version: u32,
@@ -250,6 +261,7 @@ struct StorePaths {
     reminder_settings_file: PathBuf,
     organizer_settings_file: PathBuf,
     interaction_settings_file: PathBuf,
+    categories_settings_file: PathBuf,
     secrets_file: PathBuf,
     device_file: PathBuf,
 }
@@ -410,7 +422,7 @@ impl Store {
             startup_page: settings.startup_page,
             enter_behavior: settings.enter_behavior,
             reminder_strategy: settings.reminder_strategy,
-            categories: CATEGORIES.iter().map(|item| item.to_string()).collect(),
+            categories: settings.categories,
         }
     }
 
@@ -509,6 +521,7 @@ impl StorePaths {
             reminder_settings_file: sync_settings_dir.join("reminder.json"),
             organizer_settings_file: sync_settings_dir.join("organizer.json"),
             interaction_settings_file: sync_settings_dir.join("interaction.json"),
+            categories_settings_file: sync_settings_dir.join("categories.json"),
             secrets_file: local_data_dir.join("secrets.json"),
             device_file: local_data_dir.join("device.json"),
             sync_settings_dir,
@@ -545,6 +558,7 @@ fn default_settings() -> Settings {
         startup_page: default_startup_page(),
         enter_behavior: default_enter_behavior(),
         reminder_strategy: default_reminder_strategy(),
+        categories: default_categories(),
     }
 }
 
@@ -566,6 +580,10 @@ fn default_enter_behavior() -> String {
 
 fn default_reminder_strategy() -> String {
     "confirm".to_string()
+}
+
+fn default_categories() -> Vec<String> {
+    CATEGORIES.iter().map(|item| item.to_string()).collect()
 }
 
 fn default_data() -> DataFile {
@@ -641,6 +659,10 @@ fn read_settings(paths: &StorePaths, fallback: &Settings) -> Settings {
         startup_page: fallback.startup_page.clone(),
         enter_behavior: fallback.enter_behavior.clone(),
     });
+    let categories_settings = read_json_file::<CategoriesSettingsFile>(&paths.categories_settings_file).unwrap_or_else(|| CategoriesSettingsFile {
+        schema_version: default_schema_version(),
+        categories: fallback.categories.clone(),
+    });
     let secrets = read_json_file::<SecretsFile>(&paths.secrets_file).unwrap_or_else(|| SecretsFile {
         schema_version: default_schema_version(),
         api_key: fallback.api_key.clone(),
@@ -656,6 +678,7 @@ fn read_settings(paths: &StorePaths, fallback: &Settings) -> Settings {
         startup_page: interaction_settings.startup_page,
         enter_behavior: interaction_settings.enter_behavior,
         reminder_strategy: reminder_settings.reminder_strategy,
+        categories: categories_settings.categories,
     })
 }
 
@@ -717,6 +740,13 @@ fn write_settings_files(paths: &StorePaths, settings: &Settings) -> Result<(), S
             schema_version: default_schema_version(),
             startup_page: settings.startup_page.clone(),
             enter_behavior: settings.enter_behavior.clone(),
+        },
+    )?;
+    write_json_file(
+        &paths.categories_settings_file,
+        &CategoriesSettingsFile {
+            schema_version: default_schema_version(),
+            categories: settings.categories.clone(),
         },
     )?;
     write_json_file(
@@ -827,6 +857,23 @@ pub fn sanitize_settings(input: Settings) -> Settings {
         startup_page: normalize_choice(input.startup_page, &["notes", "organize", "settings"], &fallback.startup_page),
         enter_behavior: normalize_choice(input.enter_behavior, &["save", "newline"], &fallback.enter_behavior),
         reminder_strategy: normalize_choice(input.reminder_strategy, &["confirm", "organize", "off"], &fallback.reminder_strategy),
+        categories: sanitize_categories(input.categories),
+    }
+}
+
+fn sanitize_categories(categories: Vec<String>) -> Vec<String> {
+    let mut cleaned = Vec::new();
+    for category in categories {
+        if let Some(value) = clean_string(category) {
+            if value.chars().count() <= 24 && !cleaned.iter().any(|item| item == &value) {
+                cleaned.push(value);
+            }
+        }
+    }
+    if cleaned.is_empty() {
+        default_categories()
+    } else {
+        cleaned
     }
 }
 
@@ -880,7 +927,7 @@ where
         Some(data) => Some(data),
         None => {
             let extension = file_path.extension().and_then(|value| value.to_str()).unwrap_or("json");
-            let broken_path = file_path.with_extension(format!("{extension}.broken-{}", Utc::now().timestamp_millis()));
+            let broken_path = file_path.with_extension(format!("{extension}.broken-{}", Local::now().timestamp_millis()));
             let _ = fs::rename(file_path, broken_path);
             None
         }
@@ -958,12 +1005,9 @@ fn clean_project(value: String) -> Option<String> {
 }
 
 pub fn normalize_category(value: &str) -> String {
-    let trimmed = value.trim();
-    if CATEGORIES.contains(&trimmed) {
-        trimmed.to_string()
-    } else {
-        String::new()
-    }
+    clean_string(value.to_string())
+        .filter(|category| category.chars().count() <= 24)
+        .unwrap_or_default()
 }
 
 fn clean_string(value: String) -> Option<String> {
@@ -1018,5 +1062,5 @@ fn to_month_key() -> String {
 }
 
 pub fn now_iso() -> String {
-    Utc::now().to_rfc3339()
+    Local::now().to_rfc3339()
 }

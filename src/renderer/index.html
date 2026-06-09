@@ -116,6 +116,15 @@
           </div>
           <p id="updateStatus" class="hint" role="status" aria-live="polite">通过 GitHub Releases 获取最新版本。</p>
         </fieldset>
+        <fieldset class="settings-section category-manage-section">
+          <legend>分类管理</legend>
+          <div class="category-manage-input">
+            <input id="newCategoryInput" type="text" maxlength="24" placeholder="新增分类，例如：联调支持">
+            <button id="addCategoryButton" class="secondary" type="button">添加</button>
+          </div>
+          <div id="categoryList" class="category-manage-list" aria-live="polite"></div>
+          <p class="hint">分类会保存到本机同步设置，记录页下方会自动更新。</p>
+        </fieldset>
         <button id="advancedSettingsToggle" class="secondary advanced-toggle" type="button" aria-expanded="false" aria-controls="advancedSettingsPanel">高级设置</button>
         <section id="advancedSettingsPanel" class="advanced-settings" hidden>
           <label for="dailyTemplate">日报模板</label>

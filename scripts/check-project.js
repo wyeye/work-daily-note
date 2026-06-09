@@ -5,7 +5,7 @@ const path = require('path');
 
 const root = path.resolve(__dirname, '..');
 const readText = (relative) => fs.readFileSync(path.join(root, relative), 'utf-8');
-const expectedSplitSettingsPaths = ['sync-data/settings/organizer.json', 'local-data/secrets.json'];
+const expectedSplitSettingsPaths = ['sync-data/settings/organizer.json', 'sync-data/settings/categories.json', 'local-data/secrets.json'];
 
 function assertIncludes(text, snippet, label) {
   if (!text.includes(snippet)) {
@@ -57,6 +57,7 @@ function runJsonCompatibilityChecks(storeText) {
     'local-data',
     'organizer.json',
     'interaction.json',
+    'categories.json',
     'local-data',
     'secrets_file',
     'default_daily_template',
@@ -66,7 +67,8 @@ function runJsonCompatibilityChecks(storeText) {
     'default_reminder_strategy',
     'write_json_file',
     'temp_json_path',
-    'sanitize_settings'
+    'sanitize_settings',
+    'settings.categories'
   ]);
 }
 
@@ -225,6 +227,9 @@ assertRequiredSnippets('renderer redesign', htmlText + rendererText, [
   'sourceRevisionHash',
   'normalizeSettings',
   'renderReminderNotes',
+  'formatNoteTime',
+  'renderCategoryManager',
+  '分类管理',
   'checkUpdate',
   'downloadAndInstall',
   'loadAppVersion',
@@ -235,7 +240,7 @@ forbiddenRendererText(styleText, ['#F97316', '#ea580c', '249, 115, 22', '#fff7ed
 assertRequiredSnippets('reminder routing', reminderText, ['reminder_strategy', 'route:set', 'reminder', 'organize', '到时间确认今日事项了']);
 runParserChecks();
 runJsonCompatibilityChecks(storeText);
-assertRequiredSnippets('workflow docs', readmeText + usageText, ['聊天式', '日报文本', '复制文本', '高级设置', '今日事项确认页', '检查更新', 'latest.json', 'TAURI_SIGNING_PRIVATE_KEY', 'sync-data', 'local-data/secrets.json']);
+assertRequiredSnippets('workflow docs', readmeText + usageText, ['聊天式', '日报文本', '复制文本', '高级设置', '今日事项确认页', '检查更新', 'latest.json', 'TAURI_SIGNING_PRIVATE_KEY', '分类管理', 'categories.json', 'sync-data', 'local-data/secrets.json']);
 forbiddenRendererText(htmlText + rendererText, ['禅道'], 'renderer');
 
 console.log('project check passed');

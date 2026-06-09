@@ -1,4 +1,4 @@
-use crate::store::{CategorySummary, Note, OrganizeResult, ProjectSummary, Settings, CATEGORIES};
+use crate::store::{CategorySummary, Note, OrganizeResult, ProjectSummary, Settings};
 use serde::Deserialize;
 use serde_json::{json, Value};
 
@@ -184,6 +184,12 @@ fn build_prompt(settings: &Settings, notes: &[Note]) -> String {
         .collect::<Vec<_>>()
         .join("\n");
 
+    let categories = if settings.categories.is_empty() {
+        vec!["未分类".to_string()]
+    } else {
+        settings.categories.clone()
+    };
+
     [
         "你是日报整理助手。请根据用户当天零散工作事项，整理结构化日报。".to_string(),
         "日报模板：".to_string(),
@@ -191,7 +197,7 @@ fn build_prompt(settings: &Settings, notes: &[Note]) -> String {
         "项目识别规则：".to_string(),
         project_rules,
         "分类整理要求：".to_string(),
-        format!("- 工作类型只能从这些分类选择：{}", CATEGORIES.join("、")),
+        format!("- 工作类型优先从这些分类选择：{}", categories.join("、")),
         "- categorySummaries 每项包含 category 和 summary。".to_string(),
         "项目整理要求：".to_string(),
         format!("- 优先按用户项目线索顺序整理：{}", if project_order.is_empty() { "无".to_string() } else { project_order.join("、") }),
