@@ -5,7 +5,8 @@ const path = require('path');
 
 const root = path.resolve(__dirname, '..');
 const bundleDir = path.resolve(root, process.argv[2] || 'src-tauri/target/release/bundle/nsis');
-const outputPath = path.resolve(root, process.argv[3] || 'latest.json');
+const outputPath = path.resolve(root, process.argv[3] || 'updater-release/latest.json');
+const releaseAssetDir = path.dirname(outputPath);
 
 function readJson(relative) {
   return JSON.parse(fs.readFileSync(path.join(root, relative), 'utf-8'));
@@ -14,6 +15,17 @@ function readJson(relative) {
 function fail(message) {
   console.error(message);
   process.exit(1);
+}
+
+function releaseAssetName(fileName) {
+  return fileName.replace(/\s+/g, '.');
+}
+
+function copyReleaseAsset(sourcePath, assetName) {
+  fs.mkdirSync(releaseAssetDir, { recursive: true });
+  const targetPath = path.join(releaseAssetDir, assetName);
+  fs.copyFileSync(sourcePath, targetPath);
+  return targetPath;
 }
 
 function findInstaller(dir) {
@@ -36,9 +48,13 @@ function findInstaller(dir) {
 const packageJson = readJson('package.json');
 const repository = process.env.GITHUB_REPOSITORY || 'wyeye/work-daily-note';
 const tagName = process.env.GITHUB_REF_NAME || `v${packageJson.version}`;
-const { installerName, signaturePath } = findInstaller(bundleDir);
-const signature = fs.readFileSync(signaturePath, 'utf-8').trim();
-const browser_download_url = `https://github.com/${repository}/releases/download/${tagName}/${encodeURIComponent(installerName)}`;
+const { installerName, installerPath, signaturePath } = findInstaller(bundleDir);
+const releaseInstallerName = releaseAssetName(installerName);
+const releaseSignatureName = releaseAssetName(`${installerName}.sig`);
+const releaseInstallerPath = copyReleaseAsset(installerPath, releaseInstallerName);
+const releaseSignaturePath = copyReleaseAsset(signaturePath, releaseSignatureName);
+const signature = fs.readFileSync(releaseSignaturePath, 'utf-8').trim();
+const browser_download_url = `https://github.com/${repository}/releases/download/${tagName}/${encodeURIComponent(releaseInstallerName)}`;
 
 const latest = {
   version: packageJson.version,
@@ -53,4 +69,5 @@ const latest = {
 };
 
 fs.writeFileSync(outputPath, `${JSON.stringify(latest, null, 2)}\n`, 'utf-8');
+console.log(`Prepared updater assets: ${releaseInstallerPath}, ${releaseSignaturePath}`);
 console.log(`Generated updater latest.json: ${outputPath}`);
