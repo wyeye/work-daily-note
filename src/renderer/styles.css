@@ -286,6 +286,27 @@ select:focus {
   font-weight: 800;
 }
 
+
+.update-section {
+  gap: 12px;
+}
+
+.version-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  border: 1px solid rgba(13, 148, 136, 0.14);
+  border-radius: 12px;
+  background: #F8FFFE;
+  padding: 10px 12px;
+}
+
+.update-actions {
+  justify-content: flex-start;
+  margin-top: 0;
+}
+
 .advanced-toggle {
   justify-self: start;
 }

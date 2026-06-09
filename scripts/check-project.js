@@ -81,6 +81,7 @@ const requiredFiles = [
   'package.json',
   '.github/workflows/build-windows.yml',
   'scripts/set-version.js',
+  'scripts/create-updater-latest-json.js',
   'src-tauri/Cargo.toml',
   'src-tauri/Cargo.lock',
   'src-tauri/tauri.conf.json',
@@ -159,13 +160,14 @@ for (const snippet of ['package-lock.json', 'src-tauri/Cargo.toml', 'src-tauri/C
 }
 
 const workflowText = readText('.github/workflows/build-windows.yml');
-for (const snippet of ['push:', 'tags:', '- v*', 'workflow_dispatch:', 'runs-on: windows-2022', 'npm run tauri:build -- --verbose --ci', 'work-daily-note-windows-${{ github.ref_name }}']) {
+for (const snippet of ['push:', 'tags:', '- v*', 'workflow_dispatch:', 'runs-on: windows-2022', 'npm run tauri:build -- --verbose --ci', 'work-daily-note-windows-${{ github.ref_name }}', 'TAURI_SIGNING_PRIVATE_KEY', 'scripts/create-updater-latest-json.js', 'latest.json']) {
   if (!workflowText.includes(snippet)) {
     throw new Error(`missing workflow snippet: ${snippet}`);
   }
 }
 
 const tauriConfigText = readText('src-tauri/tauri.conf.json');
+assertRequiredSnippets('Tauri updater config', tauriConfigText, ['createUpdaterArtifacts', 'plugins', 'updater', 'pubkey', 'latest.json', 'installMode']);
 for (const iconPath of ['../src/assets/icons/app.ico', '../src/assets/icons/app.png', '../src/assets/icons/app-256.png']) {
   if (!tauriConfigText.includes(iconPath)) {
     throw new Error(`missing Tauri icon config: ${iconPath}`);
@@ -181,6 +183,7 @@ for (const commandName of ['list_notes', 'add_note', 'update_note', 'delete_note
 if (!mainText.includes('include_bytes!("../../src/assets/icons/app-16.png")')) {
   throw new Error('missing Tauri tray icon wiring: app-16.png');
 }
+assertRequiredSnippets('Tauri updater plugins', mainText, ['tauri_plugin_updater::Builder::new().build()', 'tauri_plugin_process::init()']);
 
 const rendererText = readText('src/renderer/app.js');
 for (const commandName of ['list_notes', 'add_note', 'update_note', 'delete_note', 'get_settings', 'save_settings', 'get_daily_result', 'organize_daily_notes_command', 'write_clipboard', 'hide_window']) {
@@ -193,7 +196,7 @@ if (rendererText.includes('window.dailyNote')) {
 }
 
 const htmlText = readText('src/renderer/index.html');
-for (const elementId of ['noteForm', 'notesList', 'organizeButton', 'copyButton', 'settingsForm', 'reminderView', 'reminderNotesList', 'advancedSettingsToggle', 'dailyResultPanel', 'projectSummaryList']) {
+for (const elementId of ['noteForm', 'notesList', 'organizeButton', 'copyButton', 'settingsForm', 'reminderView', 'reminderNotesList', 'advancedSettingsToggle', 'dailyResultPanel', 'projectSummaryList', 'appVersion', 'checkUpdateButton', 'updateStatus']) {
   if (!htmlText.includes(elementId)) {
     throw new Error(`missing element id: ${elementId}`);
   }
@@ -221,14 +224,18 @@ assertRequiredSnippets('renderer redesign', htmlText + rendererText, [
   'reminderStartButton',
   'sourceRevisionHash',
   'normalizeSettings',
-  'renderReminderNotes'
+  'renderReminderNotes',
+  'checkUpdate',
+  'downloadAndInstall',
+  'loadAppVersion',
+  'handleCheckUpdate'
 ]);
 assertRequiredSnippets('style redesign', styleText, ['#0D9488', '#14B8A6', '#0F766E', 'prefers-reduced-motion', 'result-tabs', 'advanced-settings', 'reminder-card']);
 forbiddenRendererText(styleText, ['#F97316', '#ea580c', '249, 115, 22', '#fff7ed', '#c2410c', '#ffedd5'], 'style');
 assertRequiredSnippets('reminder routing', reminderText, ['reminder_strategy', 'route:set', 'reminder', 'organize', '到时间确认今日事项了']);
 runParserChecks();
 runJsonCompatibilityChecks(storeText);
-assertRequiredSnippets('workflow docs', readmeText + usageText, ['聊天式', '日报文本', '复制文本', '高级设置', '今日事项确认页', 'sync-data', 'local-data/secrets.json']);
+assertRequiredSnippets('workflow docs', readmeText + usageText, ['聊天式', '日报文本', '复制文本', '高级设置', '今日事项确认页', '检查更新', 'latest.json', 'TAURI_SIGNING_PRIVATE_KEY', 'sync-data', 'local-data/secrets.json']);
 forbiddenRendererText(htmlText + rendererText, ['禅道'], 'renderer');
 
 console.log('project check passed');

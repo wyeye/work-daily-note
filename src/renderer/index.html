@@ -105,6 +105,17 @@
           <label for="reminderTime">提醒时间</label>
           <input id="reminderTime" type="time" value="18:00">
         </fieldset>
+        <fieldset class="settings-section update-section">
+          <legend>应用更新</legend>
+          <div class="version-row">
+            <span>当前版本</span>
+            <strong id="appVersion">读取中...</strong>
+          </div>
+          <div class="actions update-actions">
+            <button id="checkUpdateButton" class="secondary" type="button">检查更新</button>
+          </div>
+          <p id="updateStatus" class="hint" role="status" aria-live="polite">通过 GitHub Releases 获取最新版本。</p>
+        </fieldset>
         <button id="advancedSettingsToggle" class="secondary advanced-toggle" type="button" aria-expanded="false" aria-controls="advancedSettingsPanel">高级设置</button>
         <section id="advancedSettingsPanel" class="advanced-settings" hidden>
           <label for="dailyTemplate">日报模板</label>

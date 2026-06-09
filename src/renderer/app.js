@@ -3,6 +3,9 @@
 const tauri = window.__TAURI__;
 const invoke = tauri.core.invoke;
 const listen = tauri.event.listen;
+const appApi = tauri.app;
+const updater = tauri.updater;
+const processApi = tauri.process;
 
 const dailyNoteApi = {
   listNotes: (date) => invoke('list_notes', { date: date || null }),
@@ -16,6 +19,9 @@ const dailyNoteApi = {
   writeClipboard: (text) => invoke('write_clipboard', { text }),
   hideWindow: () => invoke('hide_window'),
   showOrganizer: () => invoke('show_organizer'),
+  getAppVersion: () => appApi.getVersion(),
+  checkUpdate: () => updater.check(),
+  relaunch: () => processApi.relaunch(),
   onRouteSet: (callback) => listen('route:set', (event) => callback(event.payload))
 };
 
@@ -81,6 +87,9 @@ const elements = {
   startupPage: document.getElementById('startupPage'),
   enterBehavior: document.getElementById('enterBehavior'),
   reminderStrategy: document.getElementById('reminderStrategy'),
+  appVersion: document.getElementById('appVersion'),
+  checkUpdateButton: document.getElementById('checkUpdateButton'),
+  updateStatus: document.getElementById('updateStatus'),
   toast: document.getElementById('toast')
 };
 
@@ -547,6 +556,71 @@ async function remindLater() {
   }
 }
 
+
+function setUpdateStatus(message) {
+  elements.updateStatus.textContent = message;
+}
+
+async function loadAppVersion() {
+  try {
+    const version = await dailyNoteApi.getAppVersion();
+    elements.appVersion.textContent = version ? `v${version}` : '未知版本';
+  } catch (error) {
+    elements.appVersion.textContent = '读取失败';
+    setUpdateStatus(error.message || '读取版本失败');
+  }
+}
+
+function describeUpdateProgress(event) {
+  if (!event || !event.event) {
+    return '正在下载安装包...';
+  }
+  if (event.event === 'Started') {
+    return '开始下载安装包...';
+  }
+  if (event.event === 'Progress') {
+    return '正在下载安装包...';
+  }
+  if (event.event === 'Finished') {
+    return '下载完成，正在安装...';
+  }
+  return '正在处理更新...';
+}
+
+async function handleCheckUpdate() {
+  elements.checkUpdateButton.disabled = true;
+  elements.checkUpdateButton.textContent = '检查中...';
+  setUpdateStatus('正在检查最新版本...');
+  try {
+    const update = await dailyNoteApi.checkUpdate();
+    if (!update) {
+      setUpdateStatus('当前已是最新版本');
+      showToast('当前已是最新版本');
+      return;
+    }
+    const notes = update.body ? `
+
+${update.body}` : '';
+    const confirmed = window.confirm(`检测到新版本 v${update.version}，是否下载并安装？${notes}`);
+    if (!confirmed) {
+      setUpdateStatus(`发现新版本 v${update.version}，已取消安装`);
+      return;
+    }
+    elements.checkUpdateButton.textContent = '更新中...';
+    setUpdateStatus(`正在安装 v${update.version}...`);
+    await update.downloadAndInstall((event) => setUpdateStatus(describeUpdateProgress(event)));
+    setUpdateStatus('更新已安装，正在重启应用...');
+    await dailyNoteApi.relaunch();
+  } catch (error) {
+    const message = error.message || String(error) || '检查更新失败';
+    setUpdateStatus(message);
+    showToast(message);
+  } finally {
+    elements.checkUpdateButton.disabled = false;
+    elements.checkUpdateButton.textContent = '检查更新';
+  }
+}
+
 async function loadSettings() {
   const settings = await dailyNoteApi.getSettings();
   applySettingsToForm(settings);
@@ -573,6 +647,7 @@ function bindEvents() {
   });
   elements.advancedSettingsToggle.addEventListener('click', () => toggleAdvancedSettings());
   elements.settingsForm.addEventListener('submit', saveSettings);
+  elements.checkUpdateButton.addEventListener('click', handleCheckUpdate);
   elements.organizeButton.addEventListener('click', organizeToday);
   elements.copyButton.addEventListener('click', copyResult);
   elements.reminderStartButton.addEventListener('click', startReminderOrganizing);
@@ -586,6 +661,7 @@ function bindEvents() {
 async function boot() {
   bindEvents();
   await loadSettings();
+  await loadAppVersion();
   await loadNotes();
   await loadDailyResult();
   setRoute(state.settings.startupPage);
